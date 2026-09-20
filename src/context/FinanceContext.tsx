@@ -54,6 +54,8 @@ interface FinanceContextType {
   deleteTransaction: (id: string) => Promise<{ error?: string }>;
   // Accounts
   addAccount: (data: Omit<Account, 'id' | 'created_at' | 'updated_at'>) => Promise<{ error?: string; account?: Account }>;
+  updateAccount: (id: string, updates: Partial<Account>) => Promise<{ error?: string }>;
+  deleteAccount: (id: string) => Promise<{ error?: string }>;
   // Goals
   addGoal: (data: Omit<Goal, 'id' | 'created_at' | 'updated_at'>) => Promise<{ error?: string; goal?: Goal }>;
   updateGoalAmount: (id: string, additionalAmount: number) => Promise<{ error?: string }>;
@@ -257,9 +259,29 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, [family?.id, isDemoMode, loadFinanceData]);
 
+  // Enriched Accounts with dynamically reconciled current_balance
+  const enrichedAccounts = useMemo(() => {
+    return accounts.map((acc) => {
+      let delta = 0;
+      for (const tx of transactions) {
+        if (tx.account_id === acc.id) {
+          delta += tx.type === 'income' ? Number(tx.amount) : -Number(tx.amount);
+        }
+      }
+      for (const trf of transfers) {
+        if (trf.to_account_id === acc.id) delta += Number(trf.amount);
+        if (trf.from_account_id === acc.id) delta -= Number(trf.amount);
+      }
+      return {
+        ...acc,
+        current_balance: Number(acc.initial_balance || 0) + delta,
+      };
+    });
+  }, [accounts, transactions, transfers]);
+
   // Enriched Transactions with Account & Category Info & Creator
   const enrichedTransactions = useMemo(() => {
-    const accMap = new Map(accounts.map((a) => [a.id, a.name]));
+    const accMap = new Map(enrichedAccounts.map((a) => [a.id, a.name]));
     const catMap = new Map(categories.map((c) => [c.id, { name: c.name, icon: c.icon }]));
     const memberMap = new Map((members || []).map((m) => [m.user_id, m.profile?.full_name]));
 
@@ -277,11 +299,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         creator_name: tx.creator_name || memberName || 'Keluarga',
       };
     });
-  }, [transactions, accounts, categories, members, user?.id, profile?.full_name]);
+  }, [transactions, enrichedAccounts, categories, members, user?.id, profile?.full_name]);
 
   // Enriched Transfers with Account Names & Creator
   const enrichedTransfers = useMemo(() => {
-    const accMap = new Map(accounts.map((a) => [a.id, a.name]));
+    const accMap = new Map(enrichedAccounts.map((a) => [a.id, a.name]));
     const memberMap = new Map((members || []).map((m) => [m.user_id, m.profile?.full_name]));
 
     return transfers.map((trf) => {
@@ -296,11 +318,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         creator_name: trf.creator_name || memberName || 'Keluarga',
       };
     });
-  }, [transfers, accounts, members, user?.id, profile?.full_name]);
+  }, [transfers, enrichedAccounts, members, user?.id, profile?.full_name]);
 
   // Enriched Recurring Transactions
   const enrichedRecurring = useMemo(() => {
-    const accMap = new Map(accounts.map((a) => [a.id, a.name]));
+    const accMap = new Map(enrichedAccounts.map((a) => [a.id, a.name]));
     const catMap = new Map(categories.map((c) => [c.id, { name: c.name, icon: c.icon }]));
     return recurringTransactions.map((rec) => ({
       ...rec,
@@ -308,11 +330,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       category_name: rec.category_id ? catMap.get(rec.category_id)?.name || 'Tagihan' : undefined,
       category_icon: rec.category_id ? catMap.get(rec.category_id)?.icon || 'Receipt' : undefined,
     }));
-  }, [recurringTransactions, accounts, categories]);
+  }, [recurringTransactions, enrichedAccounts, categories]);
 
   // Enriched Templates
   const enrichedTemplates = useMemo(() => {
-    const accMap = new Map(accounts.map((a) => [a.id, a.name]));
+    const accMap = new Map(enrichedAccounts.map((a) => [a.id, a.name]));
     const catMap = new Map(categories.map((c) => [c.id, { name: c.name, icon: c.icon }]));
     return templates.map((tpl) => ({
       ...tpl,
@@ -320,11 +342,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       category_name: tpl.category_id ? catMap.get(tpl.category_id)?.name : undefined,
       category_icon: tpl.category_id ? catMap.get(tpl.category_id)?.icon : undefined,
     }));
-  }, [templates, accounts, categories]);
+  }, [templates, enrichedAccounts, categories]);
 
   // Financial Overview Aggregations (Transfers are strictly excluded from income/expense)
   const { totalBalance, incomeThisMonth, expenseThisMonth, remainingCashFlow, financialHealth } = useMemo(() => {
-    const totalBal = accounts.reduce((sum, acc) => sum + (acc.current_balance || 0), 0);
+    const totalBal = enrichedAccounts.reduce((sum, acc) => sum + (acc.current_balance || 0), 0);
 
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -368,15 +390,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       health = {
         status: 'attention',
         headline: 'Pengeluaran bulan ini sedikit melebihi pemasukan',
-        detail: 'Yuk, lihat bersama kategori apa yang sedang meningkat bulan ini untuk penyesuaian.',
+        detail: 'Pertimbangkan menunda pengeluaran opsional agar arus kas kembali seimbang.',
         savingsRate: 0,
         cashFlowRatio: Number(cashFlowRatio.toFixed(1)),
       };
-    } else if (savingsRate < 10) {
+    } else if (savingsRate >= 20) {
       health = {
-        status: 'moderate',
-        headline: 'Cash flow keluarga positif dan terkendali',
-        detail: 'Ada sisa dana yang bisa dialokasikan perlahan ke dana darurat atau tabungan bersama.',
+        status: 'healthy',
+        headline: 'Arus kas keluarga sangat prima dan sehat',
+        detail: 'Porsi tabungan mencapai lebih dari 20% dari total pemasukan bulan ini.',
         savingsRate: Math.round(savingsRate),
         cashFlowRatio: Number(cashFlowRatio.toFixed(1)),
       };
@@ -389,7 +411,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       remainingCashFlow: net,
       financialHealth: health,
     };
-  }, [accounts, transactions]);
+  }, [enrichedAccounts, transactions]);
 
   // Record Family Activity Helper
   const recordActivity = async (
@@ -1017,6 +1039,54 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const updateAccount = async (id: string, updates: Partial<Account>): Promise<{ error?: string }> => {
+    if (isSupabaseConfigured && !isDemoMode) {
+      try {
+        const { error } = await supabase.from('accounts').update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        }).eq('id', id);
+        if (error) return { error: error.message };
+        await loadFinanceData();
+        return {};
+      } catch (err: any) {
+        return { error: err?.message || 'Gagal mengubah akun' };
+      }
+    } else {
+      const updatedAccounts = accounts.map((a) => (a.id === id ? { ...a, ...updates, updated_at: new Date().toISOString() } : a));
+      setAccounts(updatedAccounts);
+      localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(updatedAccounts));
+      return {};
+    }
+  };
+
+  const deleteAccount = async (id: string): Promise<{ error?: string }> => {
+    const hasTransactions = transactions.some((t) => t.account_id === id);
+    const hasTransfers = transfers.some((tr) => tr.from_account_id === id || tr.to_account_id === id);
+
+    if (hasTransactions || hasTransfers) {
+      return {
+        error: 'Rekening ini memiliki riwayat transaksi/transfer. Silakan hapus atau pindahkan transaksi terkait terlebih dahulu.',
+      };
+    }
+
+    if (isSupabaseConfigured && !isDemoMode) {
+      try {
+        const { error } = await supabase.from('accounts').delete().eq('id', id);
+        if (error) return { error: error.message };
+        await loadFinanceData();
+        return {};
+      } catch (err: any) {
+        return { error: err?.message || 'Gagal menghapus akun' };
+      }
+    } else {
+      const updatedAccounts = accounts.filter((a) => a.id !== id);
+      setAccounts(updatedAccounts);
+      localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(updatedAccounts));
+      return {};
+    }
+  };
+
   const addGoal = async (
     data: Omit<Goal, 'id' | 'created_at' | 'updated_at'>
   ): Promise<{ error?: string; goal?: Goal }> => {
@@ -1134,7 +1204,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   return (
     <FinanceContext.Provider
       value={{
-        accounts,
+        accounts: enrichedAccounts,
         categories,
         transactions: enrichedTransactions,
         goals,
@@ -1155,6 +1225,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateTransaction,
         deleteTransaction,
         addAccount,
+        updateAccount,
+        deleteAccount,
         addGoal,
         updateGoalAmount,
         setCategoryBudget,
