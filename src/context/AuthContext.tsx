@@ -31,8 +31,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
+            setIsDemoMode(false);
+            localStorage.removeItem(LOCAL_DEMO_USER_KEY);
             setUser({ id: session.user.id, email: session.user.email || '' });
-            // Fetch profile
+            
+            // Fetch or create profile
             const { data: prof } = await supabase
               .from('profiles')
               .select('*')
@@ -42,27 +45,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (prof) {
               setProfile(prof as UserProfile);
             } else {
-              setProfile({
+              const fallbackName = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Anggota Keluarga';
+              const newProf = {
                 id: session.user.id,
-                full_name: session.user.user_metadata?.full_name || 'Anggota Keluarga',
-              });
+                full_name: fallbackName,
+              };
+              setProfile(newProf);
+              try {
+                await supabase.from('profiles').upsert(newProf);
+              } catch {}
             }
+            setLoading(false);
+            return;
           }
         } catch (e) {
-          console.warn('Supabase auth init failed, fallback to demo mode:', e);
-          setIsDemoMode(true);
+          console.warn('Supabase auth init failed:', e);
         }
       }
 
-      // If in demo mode or no live session
-      if (!isSupabaseConfigured || isDemoMode) {
-        const savedDemoId = localStorage.getItem(LOCAL_DEMO_USER_KEY) || DEMO_PROFILES[0].id;
+      // Check if user previously engaged with interactive demo
+      const savedDemoId = localStorage.getItem(LOCAL_DEMO_USER_KEY);
+      if (savedDemoId) {
+        setIsDemoMode(true);
         const initialProfile = DEMO_PROFILES.find((p) => p.id === savedDemoId) || DEMO_PROFILES[0];
         setUser({
           id: initialProfile.id,
           email: initialProfile.id.includes('andi') ? 'andi@keluarga.id' : 'sinta@keluarga.id',
         });
         setProfile(initialProfile);
+      } else {
+        // Unauthenticated state: user is null so WelcomeGate / AuthPage is presented
+        setUser(null);
+        setProfile(null);
       }
 
       setLoading(false);
@@ -73,14 +87,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isSupabaseConfigured) {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (session?.user) {
+          setIsDemoMode(false);
+          localStorage.removeItem(LOCAL_DEMO_USER_KEY);
           setUser({ id: session.user.id, email: session.user.email || '' });
           const { data: prof } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', session.user.id)
             .single();
-          if (prof) setProfile(prof as UserProfile);
+          if (prof) {
+            setProfile(prof as UserProfile);
+          } else {
+            const fallbackName = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Anggota Keluarga';
+            setProfile({ id: session.user.id, full_name: fallbackName });
+          }
         } else if (event === 'SIGNED_OUT') {
+          setIsDemoMode(false);
+          localStorage.removeItem(LOCAL_DEMO_USER_KEY);
           setUser(null);
           setProfile(null);
         }
@@ -90,18 +113,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         subscription.unsubscribe();
       };
     }
-  }, [isDemoMode]);
+  }, []);
 
   const login = async (email: string, pass: string): Promise<{ error?: string }> => {
     setLoading(true);
     try {
-      if (isSupabaseConfigured && !isDemoMode) {
+      if (isSupabaseConfigured) {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
         if (error) {
           setLoading(false);
           return { error: error.message };
         }
         if (data?.session && data.user) {
+          setIsDemoMode(false);
+          localStorage.removeItem(LOCAL_DEMO_USER_KEY);
           setUser({ id: data.user.id, email: data.user.email || email });
           const { data: prof } = await supabase
             .from('profiles')
@@ -111,16 +136,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (prof) {
             setProfile(prof as UserProfile);
           } else {
-            setProfile({
+            const fallbackName = data.user.user_metadata?.full_name || email.split('@')[0] || 'Anggota Keluarga';
+            const newProf = {
               id: data.user.id,
-              full_name: data.user.user_metadata?.full_name || 'Anggota Keluarga',
-            });
+              full_name: fallbackName,
+            };
+            setProfile(newProf);
+            try {
+              await supabase.from('profiles').upsert(newProf);
+            } catch {}
           }
         }
         setLoading(false);
         return {};
       } else {
-        // Demo mode login
+        // Offline demo mode login
+        setIsDemoMode(true);
         const foundProfile = email.toLowerCase().includes('sinta') ? DEMO_PROFILES[1] : DEMO_PROFILES[0];
         localStorage.setItem(LOCAL_DEMO_USER_KEY, foundProfile.id);
         setUser({ id: foundProfile.id, email });
@@ -201,15 +232,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    if (isSupabaseConfigured && !isDemoMode) {
-      await supabase.auth.signOut();
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.auth.signOut();
+      } catch {}
     }
+    setIsDemoMode(false);
+    localStorage.removeItem(LOCAL_DEMO_USER_KEY);
     setUser(null);
     setProfile(null);
-    localStorage.removeItem(LOCAL_DEMO_USER_KEY);
   };
 
   const switchDemoUser = (index: number) => {
+    setIsDemoMode(true);
     const target = DEMO_PROFILES[index % DEMO_PROFILES.length];
     localStorage.setItem(LOCAL_DEMO_USER_KEY, target.id);
     setUser({

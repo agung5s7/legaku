@@ -66,7 +66,7 @@ const LoadingFallback: React.FC = () => (
 );
 
 export const AppShell: React.FC = () => {
-  const { family } = useFamily();
+  const { family, loading: familyLoading } = useFamily();
   const isOnline = useOnlineStatus();
 
   const [currentView, setCurrentView] = useState<ExtendedView>('home');
@@ -90,10 +90,10 @@ export const AppShell: React.FC = () => {
 
   React.useEffect(() => {
     const onboarded = localStorage.getItem('legaku_onboarded');
-    if (!onboarded) {
+    if (!onboarded && !family && !familyLoading) {
       setShowWelcomeModal(true);
     }
-  }, []);
+  }, [family, familyLoading]);
 
   const handleUpdateSubscription = (slug: PlanSlug) => {
     const selectedPlan = DEMO_PLANS.find(p => p.slug === slug) || DEMO_PLANS[0];
@@ -112,14 +112,17 @@ export const AppShell: React.FC = () => {
     trackEvent('plan_upgraded', { plan: slug });
   };
 
-  // Check if onboarding is needed (no family)
+  // Check if onboarding is needed (only when loaded and no family exists)
   React.useEffect(() => {
+    if (familyLoading) return;
     if (!family) {
       setShowOnboarding(true);
     } else {
       setShowOnboarding(false);
+      setShowWelcomeModal(false);
+      localStorage.setItem('legaku_onboarded', 'true');
     }
-  }, [family]);
+  }, [family, familyLoading]);
 
   const handleOpenCatatWithMode = (mode: 'manual' | 'receipt' | 'voice' | 'transfer' = 'manual') => {
     if (mode === 'transfer') {

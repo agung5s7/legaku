@@ -46,13 +46,45 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     if (isSupabaseConfigured && !isDemoMode) {
       try {
-        // Fetch membership
-        const { data: memberRows, error: memberErr } = await supabase
+        // 1. Fetch membership without joining profiles directly (prevents PGRST200 schema error)
+        let { data: memberRows, error: memberErr } = await supabase
           .from('family_members')
-          .select('id, family_id, user_id, role, joined_at, profiles(id, full_name, avatar_url)')
-          .eq('user_id', user.id);
+          .select('id, family_id, user_id, role, joined_at')
+          .eq('user_id', user.id)
+          .order('joined_at', { ascending: false });
 
-        if (!memberErr && memberRows && memberRows.length > 0) {
+        // 2. Self-healing check: if user created a family but family_members record is missing
+        if ((!memberRows || memberRows.length === 0) && user.id) {
+          const { data: createdFams } = await supabase
+            .from('families')
+            .select('*')
+            .eq('created_by', user.id)
+            .order('created_at', { ascending: false });
+
+          if (createdFams && createdFams.length > 0) {
+            const primaryFam = createdFams[0];
+            await supabase.from('family_members').upsert(
+              {
+                family_id: primaryFam.id,
+                user_id: user.id,
+                role: 'owner',
+              },
+              { onConflict: 'family_id,user_id' }
+            );
+
+            const { data: refreshedMems } = await supabase
+              .from('family_members')
+              .select('id, family_id, user_id, role, joined_at')
+              .eq('user_id', user.id)
+              .order('joined_at', { ascending: false });
+
+            if (refreshedMems && refreshedMems.length > 0) {
+              memberRows = refreshedMems;
+            }
+          }
+        }
+
+        if (memberRows && memberRows.length > 0) {
           const activeFamilyId = memberRows[0].family_id;
           // Fetch family details
           const { data: famData } = await supabase
@@ -66,19 +98,45 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             // Fetch all members in this family
             const { data: allMembers } = await supabase
               .from('family_members')
-              .select('id, family_id, user_id, role, joined_at, profiles(id, full_name, avatar_url)')
+              .select('id, family_id, user_id, role, joined_at')
               .eq('family_id', activeFamilyId);
 
-            if (allMembers) {
+            if (allMembers && allMembers.length > 0) {
+              const userIds = allMembers.map((m: any) => m.user_id);
+              const { data: profs } = await supabase
+                .from('profiles')
+                .select('id, full_name, avatar_url')
+                .in('id', userIds);
+
+              const profMap = new Map((profs || []).map((p: any) => [p.id, p]));
               const formatted: FamilyMember[] = allMembers.map((m: any) => ({
                 id: m.id,
                 family_id: m.family_id,
                 user_id: m.user_id,
                 role: m.role,
                 joined_at: m.joined_at,
-                profile: m.profiles || undefined,
+                profile: profMap.get(m.user_id) || {
+                  id: m.user_id,
+                  full_name: m.role === 'owner' ? 'Kepala Keluarga' : 'Pasangan',
+                },
               }));
               setMembers(formatted);
+            }
+
+            // Auto-seed starter accounts if family has none
+            const { count: accCount } = await supabase
+              .from('accounts')
+              .select('*', { count: 'exact', head: true })
+              .eq('family_id', activeFamilyId);
+
+            if (accCount === 0 || accCount === null) {
+              try {
+                await supabase.from('accounts').insert([
+                  { family_id: activeFamilyId, name: 'Dompet Tunai', type: 'cash', initial_balance: 0, current_balance: 0 },
+                  { family_id: activeFamilyId, name: 'Rekening Bank Utama', type: 'bank', initial_balance: 0, current_balance: 0 },
+                  { family_id: activeFamilyId, name: 'E-Wallet', type: 'ewallet', initial_balance: 0, current_balance: 0 },
+                ]);
+              } catch {}
             }
           }
         } else {
@@ -147,6 +205,15 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           user_id: user.id,
           role: 'owner',
         });
+
+        // Seed starter accounts for new family
+        try {
+          await supabase.from('accounts').insert([
+            { family_id: newFam.id, name: 'Dompet Tunai', type: 'cash', initial_balance: 0, current_balance: 0 },
+            { family_id: newFam.id, name: 'Rekening Bank Utama', type: 'bank', initial_balance: 0, current_balance: 0 },
+            { family_id: newFam.id, name: 'E-Wallet', type: 'ewallet', initial_balance: 0, current_balance: 0 },
+          ]);
+        } catch {}
 
         await loadFamilyData();
         return { family: newFam as Family };

@@ -83,3 +83,24 @@ BEGIN
     RETURN jsonb_build_object('success', true, 'family_id', target_fam.id, 'family_name', target_fam.name);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 5. Auto-repair any missing owner memberships in families
+INSERT INTO public.family_members (family_id, user_id, role)
+SELECT id, created_by, 'owner'
+FROM public.families
+WHERE created_by IS NOT NULL
+ON CONFLICT (family_id, user_id) DO NOTHING;
+
+-- 6. Auto-seed starter accounts for existing families if none exist
+INSERT INTO public.accounts (family_id, name, type, initial_balance, current_balance)
+SELECT f.id, acc.name, acc.type, 0, 0
+FROM public.families f
+CROSS JOIN (
+    VALUES 
+        ('Dompet Tunai', 'cash'),
+        ('Rekening Bank Utama', 'bank'),
+        ('E-Wallet', 'ewallet')
+) AS acc(name, type)
+WHERE NOT EXISTS (
+    SELECT 1 FROM public.accounts a WHERE a.family_id = f.id
+);
