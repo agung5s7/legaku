@@ -94,7 +94,7 @@ const LOCAL_ACT_KEY = 'legaku_activities_store';
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, profile, isDemoMode } = useAuth();
-  const { family } = useFamily();
+  const { family, members } = useFamily();
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
@@ -224,31 +224,46 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, [family?.id, isDemoMode, loadFinanceData]);
 
-  // Enriched Transactions with Account & Category Info
+  // Enriched Transactions with Account & Category Info & Creator
   const enrichedTransactions = useMemo(() => {
     const accMap = new Map(accounts.map((a) => [a.id, a.name]));
     const catMap = new Map(categories.map((c) => [c.id, { name: c.name, icon: c.icon }]));
+    const memberMap = new Map((members || []).map((m) => [m.user_id, m.profile?.full_name]));
 
     return transactions.map((tx) => {
       const catInfo = catMap.get(tx.category_id);
+      const memberName = tx.created_by
+        ? (memberMap.get(tx.created_by) || (tx.created_by === user?.id ? profile?.full_name : undefined))
+        : undefined;
+
       return {
         ...tx,
         account_name: accMap.get(tx.account_id) || tx.account_name || 'Akun Lainnya',
         category_name: catInfo?.name || tx.category_name || 'Lainnya',
         category_icon: catInfo?.icon || tx.category_icon || 'Tag',
+        creator_name: tx.creator_name || memberName || 'Keluarga',
       };
     });
-  }, [transactions, accounts, categories]);
+  }, [transactions, accounts, categories, members, user?.id, profile?.full_name]);
 
-  // Enriched Transfers with Account Names
+  // Enriched Transfers with Account Names & Creator
   const enrichedTransfers = useMemo(() => {
     const accMap = new Map(accounts.map((a) => [a.id, a.name]));
-    return transfers.map((trf) => ({
-      ...trf,
-      from_account_name: accMap.get(trf.from_account_id) || trf.from_account_name || 'Akun Asal',
-      to_account_name: accMap.get(trf.to_account_id) || trf.to_account_name || 'Akun Tujuan',
-    }));
-  }, [transfers, accounts]);
+    const memberMap = new Map((members || []).map((m) => [m.user_id, m.profile?.full_name]));
+
+    return transfers.map((trf) => {
+      const memberName = trf.created_by
+        ? (memberMap.get(trf.created_by) || (trf.created_by === user?.id ? profile?.full_name : undefined))
+        : undefined;
+
+      return {
+        ...trf,
+        from_account_name: accMap.get(trf.from_account_id) || trf.from_account_name || 'Akun Asal',
+        to_account_name: accMap.get(trf.to_account_id) || trf.to_account_name || 'Akun Tujuan',
+        creator_name: trf.creator_name || memberName || 'Keluarga',
+      };
+    });
+  }, [transfers, accounts, members, user?.id, profile?.full_name]);
 
   // Enriched Recurring Transactions
   const enrichedRecurring = useMemo(() => {
@@ -394,8 +409,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   ): Promise<{ error?: string; transaction?: Transaction }> => {
     if (!family) return { error: 'Keluarga belum aktif' };
 
+    // Strip client-side enriched properties before sending payload to DB
+    const {
+      creator_name,
+      account_name,
+      category_name,
+      category_icon,
+      ...dbData
+    } = data as any;
+
     const newTxPayload = {
-      ...data,
+      ...dbData,
       family_id: family.id,
       created_by: user?.id || null,
     };
@@ -412,7 +436,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           created.id
         );
         await loadFinanceData();
-        return { transaction: created as Transaction };
+        return {
+          transaction: {
+            ...(created as Transaction),
+            creator_name: creator_name || profile?.full_name || 'Keluarga',
+          },
+        };
       } catch (err: any) {
         return { error: err?.message || 'Terjadi kesalahan sistem' };
       }
@@ -422,7 +451,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         id: `tx-${Date.now()}`,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        creator_name: profile?.full_name || 'Anggota Keluarga',
+        creator_name: creator_name || profile?.full_name || 'Anggota Keluarga',
       };
 
       const updatedTxs = [newTx, ...transactions];
@@ -459,7 +488,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const updateTransaction = async (id: string, updates: Partial<Transaction>): Promise<{ error?: string }> => {
     if (isSupabaseConfigured && !isDemoMode) {
       try {
-        const { error } = await supabase.from('transactions').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id);
+        const {
+          creator_name,
+          account_name,
+          category_name,
+          category_icon,
+          ...dbUpdates
+        } = updates as any;
+        const { error } = await supabase.from('transactions').update({ ...dbUpdates, updated_at: new Date().toISOString() }).eq('id', id);
         if (error) return { error: error.message };
         await loadFinanceData();
         return {};
@@ -539,8 +575,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return { error: 'Nominal transfer harus lebih dari 0' };
     }
 
+    const {
+      from_account_name,
+      to_account_name,
+      creator_name,
+      ...dbData
+    } = data as any;
+
     const payload = {
-      ...data,
+      ...dbData,
       family_id: family.id,
       created_by: user?.id || null,
     };
@@ -650,8 +693,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   ): Promise<{ error?: string; recurring?: RecurringTransaction }> => {
     if (!family) return { error: 'Keluarga belum aktif' };
 
+    const {
+      account_name,
+      category_name,
+      category_icon,
+      ...dbData
+    } = data as any;
+
     const payload = {
-      ...data,
+      ...dbData,
       family_id: family.id,
       created_by: user?.id || null,
     };
@@ -724,8 +774,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   ): Promise<{ error?: string; template?: TransactionTemplate }> => {
     if (!family) return { error: 'Keluarga belum aktif' };
 
+    const {
+      account_name,
+      category_name,
+      category_icon,
+      ...dbData
+    } = data as any;
+
     const payload = {
-      ...data,
+      ...dbData,
       family_id: family.id,
       created_by: user?.id || null,
     };
