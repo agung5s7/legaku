@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Logo } from '../../components/ui/Logo';
-import { Shield, Eye, EyeOff } from 'lucide-react';
+import { Shield, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 
 interface AuthPageProps {
   initialMode?: 'login' | 'register';
@@ -20,6 +20,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onBac
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +40,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onBac
     try {
       if (isRegister) {
         const res = await register(email.trim(), password, fullName.trim());
-        if (res.error) setErrorMessage(res.error);
+        if (res.error) {
+          setErrorMessage(res.error);
+        } else if (res.requiresEmailConfirmation) {
+          setEmailConfirmationSent(true);
+        }
       } else {
         const res = await login(email.trim(), password);
         if (res.error) setErrorMessage(res.error);
@@ -108,7 +113,36 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onBac
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {emailConfirmationSent ? (
+            <div className="bg-[#E8F2EC] border border-[#2E7D61]/30 p-5 rounded-2xl text-center space-y-3 animate-in fade-in">
+              <div className="w-12 h-12 rounded-full bg-[#144D3A] text-white flex items-center justify-center mx-auto shadow-xs">
+                <CheckCircle2 className="w-6 h-6 text-[#D6C6AC]" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="font-bold text-[#144D3A] text-base">Pendaftaran Berhasil!</h3>
+                <p className="text-xs text-[#1F2937] leading-relaxed">
+                  Tautan konfirmasi telah dikirim ke <strong>{email}</strong>.
+                </p>
+                <p className="text-[11px] text-[#6B7280] leading-relaxed pt-1">
+                  Silakan buka kotak masuk atau spam email Anda, lalu klik tautan konfirmasi untuk mengaktifkan akun keluarga Anda.
+                </p>
+              </div>
+              <div className="pt-2">
+                <Button
+                  variant="primary"
+                  className="w-full text-xs font-semibold py-2.5 cursor-pointer"
+                  onClick={() => {
+                    setEmailConfirmationSent(false);
+                    setIsRegister(false);
+                    setErrorMessage('');
+                  }}
+                >
+                  Sudah Konfirmasi? Masuk Sekarang →
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
             {isRegister && (
               <Input
                 label="Nama Lengkap"
@@ -159,6 +193,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onBac
               {isRegister ? 'Daftar Sekarang' : 'Masuk ke LEGAKU'}
             </Button>
           </form>
+          )}
 
           {/* Quick Demo Preview Option */}
           <div className="pt-3 border-t border-[#E5E7EB] text-center space-y-2.5">

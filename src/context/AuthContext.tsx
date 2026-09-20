@@ -9,7 +9,7 @@ interface AuthContextType {
   loading: boolean;
   isDemoMode: boolean;
   login: (email: string, pass: string) => Promise<{ error?: string }>;
-  register: (email: string, pass: string, fullName: string) => Promise<{ error?: string }>;
+  register: (email: string, pass: string, fullName: string) => Promise<{ error?: string; requiresEmailConfirmation?: boolean }>;
   logout: () => Promise<void>;
   switchDemoUser: (index: number) => void;
   setProfile: React.Dispatch<React.SetStateAction<UserProfile | null>>;
@@ -96,11 +96,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       if (isSupabaseConfigured && !isDemoMode) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
         if (error) {
           setLoading(false);
           return { error: error.message };
         }
+        if (data?.session && data.user) {
+          setUser({ id: data.user.id, email: data.user.email || email });
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', data.user.id)
+            .single();
+          if (prof) {
+            setProfile(prof as UserProfile);
+          } else {
+            setProfile({
+              id: data.user.id,
+              full_name: data.user.user_metadata?.full_name || 'Anggota Keluarga',
+            });
+          }
+        }
+        setLoading(false);
         return {};
       } else {
         // Demo mode login
@@ -117,7 +134,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (email: string, pass: string, fullName: string): Promise<{ error?: string }> => {
+  const register = async (
+    email: string,
+    pass: string,
+    fullName: string
+  ): Promise<{ error?: string; requiresEmailConfirmation?: boolean }> => {
     setLoading(true);
     try {
       if (isSupabaseConfigured && !isDemoMode) {
@@ -132,13 +153,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setLoading(false);
           return { error: error.message };
         }
-        if (data.user) {
-          // Insert profile record
-          await supabase.from('profiles').upsert({
+
+        // If email confirmation is required, session is null
+        if (!data.session) {
+          setLoading(false);
+          return { requiresEmailConfirmation: true };
+        }
+
+        // If session is immediately available (e.g. email confirmation disabled in Supabase)
+        if (data.user && data.session) {
+          setUser({ id: data.user.id, email: data.user.email || email });
+          setProfile({
             id: data.user.id,
             full_name: fullName,
           });
+
+          try {
+            await supabase.from('profiles').upsert({
+              id: data.user.id,
+              full_name: fullName,
+            });
+          } catch {
+            // Handled or non-fatal
+          }
         }
+
+        setLoading(false);
         return {};
       } else {
         // Demo new user registration
