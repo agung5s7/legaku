@@ -183,38 +183,86 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const joinFamily = async (code: string): Promise<{ error?: string; success?: boolean }> => {
     if (!user) return { error: 'Sesi pengguna tidak ditemukan' };
-    const trimmedCode = code.trim().toUpperCase();
+    
+    // Smart normalization: trim, uppercase, strip URL prefixes/query params
+    let cleanCode = code.trim().toUpperCase();
+    if (cleanCode.includes('=')) {
+      cleanCode = cleanCode.split('=').pop()?.trim() || cleanCode;
+    }
+    if (cleanCode.includes('/')) {
+      cleanCode = cleanCode.split('/').pop()?.trim() || cleanCode;
+    }
+    if (!cleanCode.startsWith('LEGAKU-') && cleanCode.length === 6) {
+      cleanCode = `LEGAKU-${cleanCode}`;
+    }
 
     if (isSupabaseConfigured && !isDemoMode) {
       try {
-        const { data: targetFam, error: findErr } = await supabase
-          .from('families')
-          .select('id, name, invite_code')
-          .eq('invite_code', trimmedCode)
-          .single();
-
-        if (findErr || !targetFam) {
-          return { error: 'Kode undangan tidak ditemukan. Mohon periksa kembali kodenya.' };
-        }
-
-        const { error: joinErr } = await supabase.from('family_members').insert({
-          family_id: targetFam.id,
-          user_id: user.id,
-          role: 'partner',
+        // 1. Try atomic security-definer RPC first (bypasses any RLS edge-cases)
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('join_family_by_invite_code', {
+          code: cleanCode,
         });
 
-        if (joinErr) {
-          return { error: 'Gagal bergabung ke keluarga. Silakan coba sesaat lagi.' };
+        if (!rpcErr && rpcRes) {
+          if (rpcRes.error) {
+            return { error: rpcRes.error };
+          }
+          await loadFamilyData();
+          return { success: true };
+        }
+
+        // 2. Direct Query Fallback
+        let queryCode = cleanCode;
+        let { data: targetFam } = await supabase
+          .from('families')
+          .select('id, name, invite_code')
+          .eq('invite_code', queryCode)
+          .maybeSingle();
+
+        // If not found and had no prefix, try with prefix
+        if (!targetFam && !queryCode.startsWith('LEGAKU-')) {
+          queryCode = `LEGAKU-${queryCode}`;
+          const res = await supabase
+            .from('families')
+            .select('id, name, invite_code')
+            .eq('invite_code', queryCode)
+            .maybeSingle();
+          targetFam = res.data;
+        }
+
+        if (!targetFam) {
+          return { error: 'Kode undangan tidak ditemukan. Mohon pastikan kode sesuai (contoh: LEGAKU-XXXXXX).' };
+        }
+
+        // Check if already a member
+        const { data: existingMember } = await supabase
+          .from('family_members')
+          .select('id')
+          .eq('family_id', targetFam.id)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (!existingMember) {
+          const { error: joinErr } = await supabase.from('family_members').insert({
+            family_id: targetFam.id,
+            user_id: user.id,
+            role: 'partner',
+          });
+
+          if (joinErr) {
+            console.error('Join family error:', joinErr);
+            return { error: joinErr.message || 'Gagal bergabung ke keluarga. Silakan coba lagi.' };
+          }
         }
 
         await loadFamilyData();
         return { success: true };
       } catch (e: any) {
-        return { error: e?.message || 'Terjadi kesalahan' };
+        return { error: e?.message || 'Terjadi kesalahan sistem saat memproses kode undangan.' };
       }
     } else {
       // Demo Mode
-      if (trimmedCode === DEMO_FAMILY.invite_code || trimmedCode.startsWith('LEGAKU-')) {
+      if (cleanCode === DEMO_FAMILY.invite_code || cleanCode.startsWith('LEGAKU-')) {
         const joinedMember: FamilyMember = {
           id: `mem-partner-${Date.now()}`,
           family_id: DEMO_FAMILY.id,

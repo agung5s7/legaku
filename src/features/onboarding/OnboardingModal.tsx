@@ -23,6 +23,18 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
   const [errorMsg, setErrorMsg] = useState('');
   const [copied, setCopied] = useState(false);
 
+  // Auto-detect invite code from URL if partner clicked a shared link
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code') || params.get('invite') || params.get('join') || params.get('family');
+      if (code) {
+        setInviteCodeInput(code.trim().toUpperCase());
+        setStep('join');
+      }
+    }
+  }, []);
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!familyName.trim()) {
@@ -156,25 +168,31 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
         {/* STEP 3: JOIN FAMILY */}
         {step === 'join' && (
           <form onSubmit={handleJoin} className="space-y-4 py-2">
-            <Input
-              label="Kode Undangan Keluarga"
-              placeholder="LEGAKU-XXXXXX"
-              value={inviteCodeInput}
-              onChange={(e) => setInviteCodeInput(e.target.value.toUpperCase())}
-              autoFocus
-            />
+            <div className="space-y-1.5">
+              <Input
+                label="Kode Undangan Keluarga"
+                placeholder="Contoh: LEGAKU-NB8G6H atau NB8G6H"
+                value={inviteCodeInput}
+                onChange={(e) => setInviteCodeInput(e.target.value)}
+                autoFocus
+                className="font-mono uppercase tracking-wider text-center text-sm font-bold"
+              />
+              <p className="text-[11px] text-[#6B7280] leading-relaxed">
+                Ketik atau tempel kode 6-karakter yang dibagikan oleh pasangan Anda. Huruf besar/kecil tidak berpengaruh.
+              </p>
+            </div>
 
-            <p className="text-[11px] text-warm-muted">
-              Contoh kode demo: <code className="font-mono font-bold text-forest-800">LEGAKU-AB12CD</code>
-            </p>
-
-            {errorMsg && <p className="text-xs text-earth-rust">{errorMsg}</p>}
+            {errorMsg && (
+              <div className="bg-rose-50 border border-rose-200 text-[#EF4444] text-xs p-3 rounded-2xl">
+                {errorMsg}
+              </div>
+            )}
 
             <div className="flex gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setStep('choose')} className="flex-1">
                 Kembali
               </Button>
-              <Button type="submit" variant="primary" isLoading={isLoading} className="flex-1">
+              <Button type="submit" variant="primary" isLoading={isLoading} className="flex-1 font-semibold">
                 Gabung Sekarang
               </Button>
             </div>
