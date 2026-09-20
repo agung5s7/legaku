@@ -92,6 +92,9 @@ const LOCAL_NOTIF_KEY = 'legaku_notifications_store';
 const LOCAL_PREF_KEY = 'legaku_notif_prefs_store';
 const LOCAL_ACT_KEY = 'legaku_activities_store';
 
+const isUuid = (str?: string | null): boolean =>
+  typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, profile, isDemoMode } = useAuth();
   const { family, members } = useFamily();
@@ -121,11 +124,41 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (isSupabaseConfigured && !isDemoMode) {
       try {
         // Accounts
-        const { data: accs } = await supabase.from('accounts').select('*').eq('family_id', family.id).order('name');
+        let { data: accs } = await supabase.from('accounts').select('*').eq('family_id', family.id).order('name');
+        if ((!accs || accs.length === 0) && family.id) {
+          try {
+            const starterAccounts = [
+              { family_id: family.id, name: 'Dompet Tunai', type: 'cash', initial_balance: 0, current_balance: 0 },
+              { family_id: family.id, name: 'Rekening Bank Utama', type: 'bank', initial_balance: 0, current_balance: 0 },
+              { family_id: family.id, name: 'E-Wallet', type: 'ewallet', initial_balance: 0, current_balance: 0 },
+            ];
+            const { data: insertedAccs } = await supabase.from('accounts').insert(starterAccounts).select();
+            if (insertedAccs && insertedAccs.length > 0) accs = insertedAccs;
+          } catch (accErr) {
+            console.warn('Auto-seed accounts warning:', accErr);
+          }
+        }
         if (accs) setAccounts(accs as Account[]);
 
-        // Categories
-        const { data: cats } = await supabase.from('categories').select('*').or(`is_default.eq.true,family_id.eq.${family.id}`).order('name');
+        // Categories (Auto-seed if empty in Supabase)
+        let { data: cats } = await supabase.from('categories').select('*').or(`is_default.eq.true,family_id.eq.${family.id}`).order('name');
+        if ((!cats || cats.length === 0) && family.id) {
+          try {
+            const defaultCatsToInsert = DEFAULT_CATEGORIES.map((c) => ({
+              family_id: family.id,
+              name: c.name,
+              type: c.type,
+              icon: c.icon,
+              is_default: false,
+            }));
+            const { data: insertedCats } = await supabase.from('categories').insert(defaultCatsToInsert).select();
+            if (insertedCats && insertedCats.length > 0) {
+              cats = insertedCats;
+            }
+          } catch (catErr) {
+            console.warn('Auto-seed categories warning:', catErr);
+          }
+        }
         if (cats && cats.length > 0) setCategories(cats as Category[]);
         else setCategories(DEFAULT_CATEGORIES);
 
@@ -426,6 +459,70 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     if (isSupabaseConfigured && !isDemoMode) {
       try {
+        // Self-heal: Resolve category_id if dummy non-UUID (e.g. 'cat-exp-2') was provided
+        if (!isUuid(newTxPayload.category_id)) {
+          const dummyCat = DEFAULT_CATEGORIES.find((c) => c.id === newTxPayload.category_id);
+          const targetName = dummyCat?.name || category_name;
+
+          // 1. Look in loaded categories state
+          let validCat = categories.find((c) => isUuid(c.id) && c.name.toLowerCase() === targetName?.toLowerCase());
+          if (!validCat) {
+            validCat = categories.find((c) => isUuid(c.id) && c.type === (data.type || 'expense'));
+          }
+
+          if (validCat) {
+            newTxPayload.category_id = validCat.id;
+          } else {
+            // 2. Query Supabase directly or create this category on the fly
+            const { data: dbCat } = await supabase
+              .from('categories')
+              .select('id')
+              .or(`is_default.eq.true,family_id.eq.${family.id}`)
+              .ilike('name', targetName || 'Lainnya')
+              .limit(1)
+              .maybeSingle();
+
+            if (dbCat && isUuid(dbCat.id)) {
+              newTxPayload.category_id = dbCat.id;
+            } else {
+              const { data: createdCat } = await supabase
+                .from('categories')
+                .insert({
+                  family_id: family.id,
+                  name: targetName || (data.type === 'income' ? 'Pemasukan Lainnya' : 'Pengeluaran Lainnya'),
+                  type: data.type || 'expense',
+                  icon: dummyCat?.icon || 'Tag',
+                  is_default: false,
+                })
+                .select('id')
+                .single();
+
+              if (createdCat && isUuid(createdCat.id)) {
+                newTxPayload.category_id = createdCat.id;
+                loadFinanceData();
+              }
+            }
+          }
+        }
+
+        // Self-heal: Resolve account_id if dummy non-UUID was provided
+        if (!isUuid(newTxPayload.account_id)) {
+          const validAcc = accounts.find((a) => isUuid(a.id));
+          if (validAcc) {
+            newTxPayload.account_id = validAcc.id;
+          } else {
+            const { data: dbAcc } = await supabase
+              .from('accounts')
+              .select('id')
+              .eq('family_id', family.id)
+              .limit(1)
+              .maybeSingle();
+            if (dbAcc && isUuid(dbAcc.id)) {
+              newTxPayload.account_id = dbAcc.id;
+            }
+          }
+        }
+
         const { data: created, error } = await supabase.from('transactions').insert(newTxPayload).select().single();
         if (error || !created) return { error: error?.message || 'Gagal menyimpan transaksi' };
         await recordActivity(
@@ -590,6 +687,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     if (isSupabaseConfigured && !isDemoMode) {
       try {
+        if (!isUuid(payload.from_account_id) || !isUuid(payload.to_account_id)) {
+          const validAccs = accounts.filter((a) => isUuid(a.id));
+          if (validAccs.length >= 2) {
+            if (!isUuid(payload.from_account_id)) payload.from_account_id = validAccs[0].id;
+            if (!isUuid(payload.to_account_id)) payload.to_account_id = validAccs[1].id;
+          }
+        }
         const { data: created, error } = await supabase.from('transfers').insert(payload).select().single();
         if (error || !created) return { error: error?.message || 'Gagal menyimpan transfer' };
 
