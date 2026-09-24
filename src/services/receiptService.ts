@@ -85,7 +85,10 @@ export async function extractReceiptInformation(
   
   const { data: uploadData, error: uploadErr } = await supabase.storage
     .from('receipts')
-    .upload(fileName, compressedFile);
+    .upload(fileName, compressedFile, {
+      contentType: compressedFile.type || 'image/jpeg',
+      upsert: true,
+    });
 
   if (uploadErr || !uploadData) {
     throw new Error('Gagal mengunggah gambar struk. Periksa koneksi internet Anda.');

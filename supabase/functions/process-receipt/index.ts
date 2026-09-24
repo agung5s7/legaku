@@ -118,7 +118,20 @@ serve(async (req) => {
     const arrayBuffer = await fileData.arrayBuffer();
     const base64Image = encodeBase64(arrayBuffer);
 
-    console.log(`[process-receipt] Calling Gemini model: ${geminiModel}`);
+    // Determine correct image MIME type
+    let mimeType = fileData.type;
+    if (!mimeType || !mimeType.startsWith("image/")) {
+      const lowerPath = storagePath.toLowerCase();
+      if (lowerPath.endsWith(".png")) {
+        mimeType = "image/png";
+      } else if (lowerPath.endsWith(".webp")) {
+        mimeType = "image/webp";
+      } else {
+        mimeType = "image/jpeg";
+      }
+    }
+
+    console.log(`[process-receipt] Calling Gemini model: ${geminiModel} with MIME type ${mimeType}`);
     
     // Call Gemini API natively using REST
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
@@ -130,7 +143,7 @@ serve(async (req) => {
             { text: RECEIPT_PROMPT },
             {
               inline_data: {
-                mime_type: fileData.type || "image/jpeg",
+                mime_type: mimeType,
                 data: base64Image,
               },
             },
