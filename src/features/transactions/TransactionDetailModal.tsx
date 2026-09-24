@@ -6,7 +6,7 @@ import { CategoryIcon } from '../../components/ui/CategoryIcon';
 import { useFinance } from '../../context/FinanceContext';
 import { Transaction } from '../../types';
 import { formatRupiah, parseRupiahInput, formatIndoDate } from '../../utils/formatters';
-import { Trash2, Edit2, Calendar, Wallet, User, Tag, Sparkles, AlertCircle, ChevronDown, Receipt } from 'lucide-react';
+import { Trash2, Edit2, Calendar, Wallet, User, Tag, Sparkles, AlertCircle, ChevronDown, ShoppingBag } from 'lucide-react';
 
 interface TransactionDetailModalProps {
   transaction: Transaction | null;
@@ -238,7 +238,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                       onClick={() => setShowItemsList(!showItemsList)}
                       className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-sage-100/70 hover:bg-sage-100 text-forest-900 border border-sage-200/80 transition-all shadow-soft cursor-pointer"
                     >
-                      <Receipt className="w-3.5 h-3.5 text-forest-700" />
+                      <ShoppingBag className="w-3.5 h-3.5 text-forest-700" />
                       <span>{mainTitle}</span>
                       <ChevronDown
                         className={`w-3.5 h-3.5 text-forest-700 transition-transform duration-200 ${
