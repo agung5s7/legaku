@@ -7,23 +7,18 @@ interface AuthContextType {
   user: { id: string; email: string } | null;
   profile: UserProfile | null;
   loading: boolean;
-  isDemoMode: boolean;
   login: (email: string, pass: string) => Promise<{ error?: string }>;
   register: (email: string, pass: string, fullName: string) => Promise<{ error?: string; requiresEmailConfirmation?: boolean }>;
   logout: () => Promise<void>;
-  switchDemoUser: (index: number) => void;
   setProfile: React.Dispatch<React.SetStateAction<UserProfile | null>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const LOCAL_DEMO_USER_KEY = 'legaku_demo_user_id';
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(!isSupabaseConfigured);
 
   useEffect(() => {
     async function initAuth() {
@@ -31,8 +26,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
-            setIsDemoMode(false);
-            localStorage.removeItem(LOCAL_DEMO_USER_KEY);
             setUser({ id: session.user.id, email: session.user.email || '' });
             
             // Fetch or create profile
@@ -63,22 +56,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Check if user previously engaged with interactive demo
-      const savedDemoId = localStorage.getItem(LOCAL_DEMO_USER_KEY);
-      if (savedDemoId) {
-        setIsDemoMode(true);
-        const initialProfile = DEMO_PROFILES.find((p) => p.id === savedDemoId) || DEMO_PROFILES[0];
-        setUser({
-          id: initialProfile.id,
-          email: initialProfile.id.includes('andi') ? 'andi@keluarga.id' : 'sinta@keluarga.id',
-        });
-        setProfile(initialProfile);
-      } else {
-        // Unauthenticated state: user is null so WelcomeGate / AuthPage is presented
-        setUser(null);
-        setProfile(null);
-      }
-
+      // Unauthenticated state: user is null so WelcomeGate / AuthPage is presented
+      setUser(null);
+      setProfile(null);
       setLoading(false);
     }
 
@@ -87,8 +67,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isSupabaseConfigured) {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (session?.user) {
-          setIsDemoMode(false);
-          localStorage.removeItem(LOCAL_DEMO_USER_KEY);
           setUser({ id: session.user.id, email: session.user.email || '' });
           const { data: prof } = await supabase
             .from('profiles')
@@ -102,8 +80,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setProfile({ id: session.user.id, full_name: fallbackName });
           }
         } else if (event === 'SIGNED_OUT') {
-          setIsDemoMode(false);
-          localStorage.removeItem(LOCAL_DEMO_USER_KEY);
           setUser(null);
           setProfile(null);
         }
@@ -125,8 +101,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { error: error.message };
         }
         if (data?.session && data.user) {
-          setIsDemoMode(false);
-          localStorage.removeItem(LOCAL_DEMO_USER_KEY);
           setUser({ id: data.user.id, email: data.user.email || email });
           const { data: prof } = await supabase
             .from('profiles')
@@ -149,16 +123,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         setLoading(false);
         return {};
-      } else {
-        // Offline demo mode login
-        setIsDemoMode(true);
-        const foundProfile = email.toLowerCase().includes('sinta') ? DEMO_PROFILES[1] : DEMO_PROFILES[0];
-        localStorage.setItem(LOCAL_DEMO_USER_KEY, foundProfile.id);
-        setUser({ id: foundProfile.id, email });
-        setProfile(foundProfile);
-        setLoading(false);
-        return {};
       }
+      setLoading(false);
+      return { error: 'Supabase tidak dikonfigurasi.' };
     } catch {
       setLoading(false);
       return { error: 'Terjadi kendala saat login. Silakan coba lagi.' };
@@ -172,7 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ): Promise<{ error?: string; requiresEmailConfirmation?: boolean }> => {
     setLoading(true);
     try {
-      if (isSupabaseConfigured && !isDemoMode) {
+      if (isSupabaseConfigured) {
         const { data, error } = await supabase.auth.signUp({
           email,
           password: pass,
@@ -211,20 +178,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setLoading(false);
         return {};
-      } else {
-        // Demo new user registration
-        const newId = `user-custom-${Date.now()}`;
-        const newProf: UserProfile = {
-          id: newId,
-          full_name: fullName,
-          created_at: new Date().toISOString(),
-        };
-        localStorage.setItem(LOCAL_DEMO_USER_KEY, newId);
-        setUser({ id: newId, email });
-        setProfile(newProf);
-        setLoading(false);
-        return {};
       }
+      setLoading(false);
+      return { error: 'Supabase tidak dikonfigurasi.' };
     } catch {
       setLoading(false);
       return { error: 'Pendaftaran belum berhasil. Silakan periksa kembali data Anda.' };
@@ -237,21 +193,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await supabase.auth.signOut();
       } catch {}
     }
-    setIsDemoMode(false);
-    localStorage.removeItem(LOCAL_DEMO_USER_KEY);
     setUser(null);
     setProfile(null);
-  };
-
-  const switchDemoUser = (index: number) => {
-    setIsDemoMode(true);
-    const target = DEMO_PROFILES[index % DEMO_PROFILES.length];
-    localStorage.setItem(LOCAL_DEMO_USER_KEY, target.id);
-    setUser({
-      id: target.id,
-      email: target.id.includes('andi') ? 'andi@keluarga.id' : 'sinta@keluarga.id',
-    });
-    setProfile(target);
   };
 
   return (
@@ -260,11 +203,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         profile,
         loading,
-        isDemoMode,
         login,
         register,
         logout,
-        switchDemoUser,
         setProfile,
       }}
     >

@@ -19,14 +19,12 @@ import {
 interface LandingPageProps {
   onStartSignup: () => void;
   onStartLogin: () => void;
-  onStartDemo: () => void;
   onBackToWelcome?: () => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   onStartSignup,
   onStartLogin,
-  onStartDemo,
   onBackToWelcome,
 }) => {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -46,7 +44,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     },
     {
       q: 'Apakah saya bisa mencoba dulu sebelum mendaftar?',
-      a: 'Tentu! Anda dapat mengklik tombol "Coba Demo" di atas untuk langsung menjelajahi antarmuka dengan data contoh keluarga bahagia tanpa perlu membuat akun.',
+      a: 'Saat ini fitur demo sedang dinonaktifkan untuk pembaruan. Silakan mendaftar secara gratis untuk menikmati fitur LEGAKU sepenuhnya.',
     },
   ];
 
@@ -79,14 +77,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 ← Layar Pembuka
               </button>
             )}
-            <button
-              onClick={onStartDemo}
-              className="text-xs font-semibold text-[#144D3A] bg-[#E8F2EC] hover:bg-[#d5e7dc] px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer active:scale-95 shadow-2xs"
-              title="Coba demo interaktif tanpa akun"
-            >
-              <Play className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-[#144D3A]" />
-              <span className="hidden sm:inline">Coba </span>Demo
-            </button>
             <button
               onClick={onStartLogin}
               className="text-xs font-semibold text-[#1F2937] hover:text-[#144D3A] px-2 sm:px-3 py-1.5 sm:py-2 transition-colors cursor-pointer active:scale-95 rounded-xl"
@@ -128,13 +118,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           >
             Mulai Sekarang — Gratis
             <ArrowRight className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onStartDemo}
-            className="w-full sm:w-auto bg-white border border-[#E5E7EB] hover:bg-[#F9FAF7] text-[#144D3A] font-bold text-sm px-6 py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-colors cursor-pointer"
-          >
-            <Play className="w-4 h-4 fill-[#144D3A]" />
-            Eksplorasi Demo
           </button>
         </div>
 

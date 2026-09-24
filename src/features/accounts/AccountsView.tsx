@@ -5,6 +5,7 @@ import { formatRupiah, parseRupiahInput, formatIndoDate } from '../../utils/form
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
+import { BrandIcon } from '../../components/ui/BrandIcon';
 import {
   Wallet,
   Landmark,
@@ -39,20 +40,6 @@ export const AccountsView: React.FC = () => {
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [manageError, setManageError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-
-  const getAccountIcon = (accType: AccountType) => {
-    switch (accType) {
-      case 'bank':
-        return <Landmark className="w-5 h-5 text-forest-700" />;
-      case 'ewallet':
-        return <Smartphone className="w-5 h-5 text-forest-700" />;
-      case 'credit_card':
-        return <CreditCard className="w-5 h-5 text-forest-700" />;
-      case 'cash':
-      default:
-        return <Wallet className="w-5 h-5 text-forest-700" />;
-    }
-  };
 
   const getAccountTypeLabel = (accType: AccountType) => {
     switch (accType) {
@@ -207,15 +194,15 @@ export const AccountsView: React.FC = () => {
               tabIndex={0}
             >
               <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-sage-100/90 group-hover:bg-sage-200/90 transition-colors flex items-center justify-center shrink-0">
-                  {getAccountIcon(acc.type)}
-                </div>
+                <BrandIcon name={acc.name} type={acc.type} className="w-11 h-11 group-hover:scale-105 transition-transform" />
                 <div>
                   <div className="flex items-center gap-1.5">
                     <h3 className="text-sm font-bold text-warm-dark group-hover:text-forest-900 transition-colors">
                       {acc.name}
                     </h3>
-                    <Edit2 className="w-3 h-3 text-warm-stone/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <span className="text-[9px] bg-forest-100 text-forest-800 px-1.5 py-0.5 rounded font-bold border border-forest-200">
+                      Kelola
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-[10px] text-warm-muted uppercase tracking-wider font-semibold">
@@ -346,9 +333,7 @@ export const AccountsView: React.FC = () => {
                 {/* Account Balance Summary Card */}
                 <div className="p-4 bg-cream-50/80 border border-warm-border/70 rounded-2xl flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-sage-100 flex items-center justify-center shrink-0">
-                      {getAccountIcon(selectedAccount.type)}
-                    </div>
+                    <BrandIcon name={selectedAccount.name} type={selectedAccount.type} className="w-12 h-12" />
                     <div>
                       <h4 className="text-base font-bold text-warm-dark">{selectedAccount.name}</h4>
                       <p className="text-xs text-warm-muted uppercase tracking-wider font-semibold">

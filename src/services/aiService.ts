@@ -18,7 +18,46 @@ export function generateDeterministicCompanionResponse(
   userQuery: string,
   ctx: FamilyFinancialContext
 ): AiResponse {
-  const q = userQuery.toLowerCase();
+  const q = userQuery.toLowerCase().trim();
+
+  // 0a. Greetings & Small Talk
+  if (
+    q === 'halo' ||
+    q === 'hallo' ||
+    q === 'hi' ||
+    q === 'hei' ||
+    q.includes('pagi') ||
+    q.includes('siang') ||
+    q.includes('sore') ||
+    q.includes('malam') ||
+    q.includes('assalamualaikum') ||
+    q.includes('apa kabar')
+  ) {
+    return {
+      content: `Halo! Senang bisa menyapa Anda. Saya LEGAKU AI, siap menjadi teman diskusi keuangan keluarga yang tenang dan bebas dari rasa dihakimi.\n\nSaat ini total saldo tercatat ${formatRupiah(ctx.totalBalance)} dengan sisa cashflow bulan ini ${formatRupiah(ctx.currentMonth.cashflow)}.\n\nAda yang ingin kita bahas atau evaluasi hari ini?`,
+      calculations: [
+        { label: 'Total Saldo', value: formatRupiah(ctx.totalBalance) },
+        { label: 'Cashflow Bulan Ini', value: formatRupiah(ctx.currentMonth.cashflow) },
+      ],
+      actionChips: ['Bulan ini kita boros nggak?', 'Pengeluaran terbesar kita apa?', 'Target impian kita gimana?'],
+    };
+  }
+
+  // 0b. Gratitude / Terima Kasih
+  if (q.includes('terima kasih') || q.includes('makasih') || q.includes('thanks') || q.includes('mantap')) {
+    return {
+      content: `Sama-sama! Senang bisa membantu keluarga Anda meraih ketenangan finansial. Jangan ragu menyapa saya kembali jika butuh saran atau simulasi ya! 💚`,
+      actionChips: ['Cek kondisi bulan ini', 'Lihat target impian'],
+    };
+  }
+
+  // 0c. Who are you / Capabilities
+  if (q.includes('siapa') || q.includes('bisa apa') || q.includes('fungsi') || q.includes('bantuan')) {
+    return {
+      content: `Saya adalah **LEGAKU AI**, asisten & teman diskusi finansial keluarga Anda.\n\nSaya bisa membantu Anda:\n1. Evaluasi arus kas (apakah bulan ini tergolong hemat atau berlebih)\n2. Menemukan pos pengeluaran terbesar keluarga\n3. Menghitung simulasi pencapaian target impian (misal: Bebas Utang / Dana Darurat)\n4. Memberi rincian kalkulasi matematika yang transparan & tenang.`,
+      actionChips: ['Bulan ini kita boros nggak?', 'Pengeluaran terbesar kita apa?'],
+    };
+  }
 
   // 1. "Boros nggak?"
   if (q.includes('boros') || q.includes('hemat') || q.includes('kondisi')) {

@@ -11,7 +11,7 @@ interface AuthPageProps {
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onBackToLanding }) => {
-  const { login, register, switchDemoUser } = useAuth();
+  const { login, register } = useAuth();
 
   const [isRegister, setIsRegister] = useState(initialMode === 'register');
   const [email, setEmail] = useState('');
@@ -54,9 +54,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onBac
     }
   };
 
-  const handleInstantDemo = (userIndex = 0) => {
-    switchDemoUser(userIndex);
-  };
 
   return (
     <div className="min-h-screen bg-[#F9FAF7] flex flex-col justify-center items-center px-4 py-10 font-sans">
@@ -194,33 +191,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ initialMode = 'login', onBac
             </Button>
           </form>
           )}
-
-          {/* Quick Demo Preview Option */}
-          <div className="pt-3 border-t border-[#E5E7EB] text-center space-y-2.5">
-            <span className="text-[11px] text-[#6B7280] block">
-              Ingin langsung mencoba tanpa mendaftar?
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => handleInstantDemo(0)}
-                className="text-xs py-2 font-medium"
-              >
-                Akun Andi (Suami)
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => handleInstantDemo(1)}
-                className="text-xs py-2 font-medium"
-              >
-                Akun Sinta (Istri)
-              </Button>
-            </div>
-          </div>
         </div>
 
         {/* Security & Privacy Assurance */}

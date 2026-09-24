@@ -5,7 +5,6 @@ import { PwaInstallGuideModal } from '../pwa/PwaInstallGuideModal';
 interface WelcomeGateProps {
   onStartSignup: () => void;
   onStartLogin: () => void;
-  onStartDemo: () => void;
   onViewLanding: () => void;
 }
 
@@ -16,7 +15,6 @@ interface WelcomeGateProps {
 export const WelcomeGate: React.FC<WelcomeGateProps> = ({
   onStartSignup,
   onStartLogin,
-  onStartDemo,
   onViewLanding,
 }) => {
   const [showPwaGuide, setShowPwaGuide] = useState(false);
@@ -109,17 +107,6 @@ export const WelcomeGate: React.FC<WelcomeGateProps> = ({
             >
               Saya sudah punya akun
             </button>
-
-            {/* Interactive Demo Mode Exploration link */}
-            <div className="pt-1 text-center">
-              <button
-                onClick={onStartDemo}
-                className="text-xs font-semibold text-[#2E7D61] hover:text-[#144D3A] inline-flex items-center gap-1.5 transition-colors py-0.5 hover:underline cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Coba Eksplorasi Demo Mode</span>
-              </button>
-            </div>
           </div>
         </div>
 

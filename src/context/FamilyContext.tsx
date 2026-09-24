@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { Family, FamilyMember } from '../types';
 import { useAuth } from './AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { DEMO_FAMILY, DEMO_FAMILY_MEMBERS } from '../lib/demoData';
 
 interface FamilyContextType {
   family: Family | null;
@@ -16,11 +15,8 @@ interface FamilyContextType {
 
 const FamilyContext = createContext<FamilyContextType | undefined>(undefined);
 
-const LOCAL_FAMILY_KEY = 'legaku_family_data';
-const LOCAL_MEMBERS_KEY = 'legaku_family_members_data';
-
 export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, profile, isDemoMode } = useAuth();
+  const { user, profile } = useAuth();
   const [family, setFamily] = useState<Family | null>(null);
   const [members, setMembers] = useState<FamilyMember[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -44,7 +40,7 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setLoading(true);
 
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         // 1. Fetch membership without joining profiles directly (prevents PGRST200 schema error)
         let { data: memberRows, error: memberErr } = await supabase
@@ -146,36 +142,10 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       } catch (err) {
         console.warn('Error fetching family from Supabase:', err);
       }
-    } else {
-      // Local demo mode
-      const savedFam = localStorage.getItem(LOCAL_FAMILY_KEY);
-      const savedMems = localStorage.getItem(LOCAL_MEMBERS_KEY);
-
-      if (savedFam) {
-        try {
-          setFamily(JSON.parse(savedFam));
-        } catch {
-          setFamily(DEMO_FAMILY);
-        }
-      } else {
-        setFamily(DEMO_FAMILY);
-        localStorage.setItem(LOCAL_FAMILY_KEY, JSON.stringify(DEMO_FAMILY));
-      }
-
-      if (savedMems) {
-        try {
-          setMembers(JSON.parse(savedMems));
-        } catch {
-          setMembers(DEMO_FAMILY_MEMBERS);
-        }
-      } else {
-        setMembers(DEMO_FAMILY_MEMBERS);
-        localStorage.setItem(LOCAL_MEMBERS_KEY, JSON.stringify(DEMO_FAMILY_MEMBERS));
-      }
     }
 
     setLoading(false);
-  }, [user, isDemoMode]);
+  }, [user]);
 
   useEffect(() => {
     loadFamilyData();
@@ -185,7 +155,7 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!user) return { error: 'Sesi pengguna tidak ditemukan' };
     const inviteCode = generateInviteCode();
 
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         const { data: newFam, error: famErr } = await supabase
           .from('families')
@@ -220,32 +190,8 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       } catch (e: any) {
         return { error: e?.message || 'Terjadi kesalahan sistem' };
       }
-    } else {
-      // Demo Mode
-      const newFam: Family = {
-        id: `fam-${Date.now()}`,
-        name,
-        invite_code: inviteCode,
-        created_by: user.id,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      const initialMember: FamilyMember = {
-        id: `mem-${Date.now()}`,
-        family_id: newFam.id,
-        user_id: user.id,
-        role: 'owner',
-        joined_at: new Date().toISOString(),
-        profile: profile || undefined,
-      };
-
-      setFamily(newFam);
-      setMembers([initialMember]);
-      localStorage.setItem(LOCAL_FAMILY_KEY, JSON.stringify(newFam));
-      localStorage.setItem(LOCAL_MEMBERS_KEY, JSON.stringify([initialMember]));
-      return { family: newFam };
     }
+    return { error: 'Supabase tidak terkonfigurasi' };
   };
 
   const joinFamily = async (code: string): Promise<{ error?: string; success?: boolean }> => {
@@ -263,7 +209,7 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       cleanCode = `LEGAKU-${cleanCode}`;
     }
 
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         // 1. Try atomic security-definer RPC first (bypasses any RLS edge-cases)
         const { data: rpcRes, error: rpcErr } = await supabase.rpc('join_family_by_invite_code', {
@@ -327,28 +273,8 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       } catch (e: any) {
         return { error: e?.message || 'Terjadi kesalahan sistem saat memproses kode undangan.' };
       }
-    } else {
-      // Demo Mode
-      if (cleanCode === DEMO_FAMILY.invite_code || cleanCode.startsWith('LEGAKU-')) {
-        const joinedMember: FamilyMember = {
-          id: `mem-partner-${Date.now()}`,
-          family_id: DEMO_FAMILY.id,
-          user_id: user.id,
-          role: 'partner',
-          joined_at: new Date().toISOString(),
-          profile: profile || undefined,
-        };
-
-        const updatedMembers = [...members.filter((m) => m.user_id !== user.id), joinedMember];
-        setFamily(DEMO_FAMILY);
-        setMembers(updatedMembers);
-        localStorage.setItem(LOCAL_FAMILY_KEY, JSON.stringify(DEMO_FAMILY));
-        localStorage.setItem(LOCAL_MEMBERS_KEY, JSON.stringify(updatedMembers));
-        return { success: true };
-      } else {
-        return { error: 'Kode undangan tidak valid. Gunakan kode seperti LEGAKU-AB12CD.' };
-      }
     }
+    return { error: 'Supabase tidak terkonfigurasi' };
   };
 
   const getInviteLink = () => {

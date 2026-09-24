@@ -49,27 +49,27 @@ interface FinanceContextType {
   remainingCashFlow: number;
   financialHealth: FinancialHealthIndicator;
   // Transactions
-  addTransaction: (data: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>) => Promise<{ error?: string; transaction?: Transaction }>;
+  addTransaction: (data: Omit<Transaction, 'id' | 'family_id' | 'created_at' | 'updated_at'> & { family_id?: string }) => Promise<{ error?: string; transaction?: Transaction }>;
   updateTransaction: (id: string, data: Partial<Transaction>) => Promise<{ error?: string }>;
   deleteTransaction: (id: string) => Promise<{ error?: string }>;
   // Accounts
-  addAccount: (data: Omit<Account, 'id' | 'created_at' | 'updated_at'>) => Promise<{ error?: string; account?: Account }>;
+  addAccount: (data: Omit<Account, 'id' | 'family_id' | 'created_at' | 'updated_at'> & { family_id?: string }) => Promise<{ error?: string; account?: Account }>;
   updateAccount: (id: string, updates: Partial<Account>) => Promise<{ error?: string }>;
   deleteAccount: (id: string) => Promise<{ error?: string }>;
   // Goals
-  addGoal: (data: Omit<Goal, 'id' | 'created_at' | 'updated_at'>) => Promise<{ error?: string; goal?: Goal }>;
+  addGoal: (data: Omit<Goal, 'id' | 'family_id' | 'created_at' | 'updated_at'> & { family_id?: string }) => Promise<{ error?: string; goal?: Goal }>;
   updateGoalAmount: (id: string, additionalAmount: number) => Promise<{ error?: string }>;
   // Budgets
   setCategoryBudget: (categoryId: string, amount: number) => Promise<{ error?: string }>;
   // Transfers (Phase 3)
-  addTransfer: (data: Omit<Transfer, 'id' | 'created_at' | 'updated_at'>) => Promise<{ error?: string; transfer?: Transfer }>;
+  addTransfer: (data: Omit<Transfer, 'id' | 'family_id' | 'created_at' | 'updated_at'> & { family_id?: string }) => Promise<{ error?: string; transfer?: Transfer }>;
   deleteTransfer: (id: string) => Promise<{ error?: string }>;
   // Recurring (Phase 3)
-  addRecurringTransaction: (data: Omit<RecurringTransaction, 'id' | 'created_at' | 'updated_at'>) => Promise<{ error?: string; recurring?: RecurringTransaction }>;
+  addRecurringTransaction: (data: Omit<RecurringTransaction, 'id' | 'family_id' | 'created_at' | 'updated_at'> & { family_id?: string }) => Promise<{ error?: string; recurring?: RecurringTransaction }>;
   toggleRecurringActive: (id: string, isActive: boolean) => Promise<{ error?: string }>;
   deleteRecurringTransaction: (id: string) => Promise<{ error?: string }>;
   // Templates (Phase 3)
-  addTemplate: (data: Omit<TransactionTemplate, 'id' | 'created_at' | 'updated_at'>) => Promise<{ error?: string; template?: TransactionTemplate }>;
+  addTemplate: (data: Omit<TransactionTemplate, 'id' | 'family_id' | 'created_at' | 'updated_at'> & { family_id?: string }) => Promise<{ error?: string; template?: TransactionTemplate }>;
   deleteTemplate: (id: string) => Promise<{ error?: string }>;
   // Notifications (Phase 3)
   markNotificationAsRead: (id: string) => Promise<void>;
@@ -98,7 +98,7 @@ const isUuid = (str?: string | null): boolean =>
   typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, profile, isDemoMode } = useAuth();
+  const { user, profile} = useAuth();
   const { family, members } = useFamily();
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -123,7 +123,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setLoading(true);
 
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         // Accounts
         let { data: accs } = await supabase.from('accounts').select('*').eq('family_id', family.id).order('name');
@@ -205,34 +205,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (e) {
         console.warn('Error querying Supabase finance data:', e);
       }
-    } else {
-      // Local demo mode
-      const savedAccs = localStorage.getItem(LOCAL_ACC_KEY);
-      const savedTxs = localStorage.getItem(LOCAL_TX_KEY);
-      const savedGoals = localStorage.getItem(LOCAL_GOAL_KEY);
-      const savedBudgets = localStorage.getItem(LOCAL_BUDGET_KEY);
-      const savedTrfs = localStorage.getItem(LOCAL_TRF_KEY);
-      const savedRecs = localStorage.getItem(LOCAL_REC_KEY);
-      const savedTpls = localStorage.getItem(LOCAL_TPL_KEY);
-      const savedNotifs = localStorage.getItem(LOCAL_NOTIF_KEY);
-      const savedPrefs = localStorage.getItem(LOCAL_PREF_KEY);
-      const savedActs = localStorage.getItem(LOCAL_ACT_KEY);
-
-      setAccounts(savedAccs ? JSON.parse(savedAccs) : DEMO_ACCOUNTS);
-      setCategories(DEFAULT_CATEGORIES);
-      setTransactions(savedTxs ? JSON.parse(savedTxs) : DEMO_TRANSACTIONS);
-      setGoals(savedGoals ? JSON.parse(savedGoals) : DEMO_GOALS);
-      setBudgets(savedBudgets ? JSON.parse(savedBudgets) : DEMO_BUDGETS);
-      setTransfers(savedTrfs ? JSON.parse(savedTrfs) : DEMO_TRANSFERS);
-      setRecurringTransactions(savedRecs ? JSON.parse(savedRecs) : DEMO_RECURRING_TRANSACTIONS);
-      setTemplates(savedTpls ? JSON.parse(savedTpls) : DEMO_TEMPLATES);
-      setNotifications(savedNotifs ? JSON.parse(savedNotifs) : DEMO_NOTIFICATIONS);
-      setNotificationPreferences(savedPrefs ? JSON.parse(savedPrefs) : DEFAULT_NOTIFICATION_PREFERENCES);
-      setActivities(savedActs ? JSON.parse(savedActs) : DEMO_ACTIVITIES);
     }
 
     setLoading(false);
-  }, [family, isDemoMode, user]);
+  }, [family, user]);
 
   useEffect(() => {
     loadFinanceData();
@@ -240,7 +216,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Centralized Supabase Realtime Subscription (Phase 1, 2 & 3 tables)
   useEffect(() => {
-    if (!isSupabaseConfigured || isDemoMode || !family?.id) return;
+    if (!isSupabaseConfigured || !family?.id) return;
 
     const channel = supabase
       .channel(`family-${family.id}-realtime`)
@@ -257,7 +233,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [family?.id, isDemoMode, loadFinanceData]);
+  }, [family?.id, loadFinanceData]);
 
   // Enriched Accounts with dynamically reconciled current_balance
   const enrichedAccounts = useMemo(() => {
@@ -436,7 +412,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       created_at: new Date().toISOString(),
     };
 
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         await supabase.from('family_activity').insert({
           family_id: family.id,
@@ -451,16 +427,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (e) {
         console.warn('Failed recording activity to Supabase:', e);
       }
-    } else {
-      const updated = [newActivity, ...activities].slice(0, 50);
-      setActivities(updated);
-      localStorage.setItem(LOCAL_ACT_KEY, JSON.stringify(updated));
     }
   };
 
   // Add Transaction
   const addTransaction = async (
-    data: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>
+    data: Omit<Transaction, 'id' | 'family_id' | 'created_at' | 'updated_at'> & { family_id?: string }
   ): Promise<{ error?: string; transaction?: Transaction }> => {
     if (!family) return { error: 'Keluarga belum aktif' };
 
@@ -479,7 +451,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       created_by: user?.id || null,
     };
 
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         // Self-heal: Resolve category_id if dummy non-UUID (e.g. 'cat-exp-2') was provided
         if (!isUuid(newTxPayload.category_id)) {
@@ -564,48 +536,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (err: any) {
         return { error: err?.message || 'Terjadi kesalahan sistem' };
       }
-    } else {
-      const newTx: Transaction = {
-        ...newTxPayload,
-        id: `tx-${Date.now()}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        creator_name: creator_name || profile?.full_name || 'Anggota Keluarga',
-      };
-
-      const updatedTxs = [newTx, ...transactions];
-      setTransactions(updatedTxs);
-      localStorage.setItem(LOCAL_TX_KEY, JSON.stringify(updatedTxs));
-
-      const updatedAccounts = accounts.map((acc) => {
-        if (acc.id === newTx.account_id) {
-          const delta = newTx.type === 'income' ? Number(newTx.amount) : -Number(newTx.amount);
-          return {
-            ...acc,
-            current_balance: Number(acc.current_balance) + delta,
-            updated_at: new Date().toISOString(),
-          };
-        }
-        return acc;
-      });
-      setAccounts(updatedAccounts);
-      localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(updatedAccounts));
-
-      await recordActivity(
-        'transaction_created',
-        'transaction',
-        `${profile?.full_name || 'Keluarga'} mencatat ${data.description}`,
-        `${data.type === 'expense' ? 'Pengeluaran' : 'Pemasukan'} Rp ${data.amount.toLocaleString('id-ID')}`,
-        newTx.id
-      );
-
-      return { transaction: newTx };
     }
+    return { error: 'Koneksi database belum tersedia' };
   };
 
   // Update Transaction
   const updateTransaction = async (id: string, updates: Partial<Transaction>): Promise<{ error?: string }> => {
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         const {
           creator_name,
@@ -621,35 +558,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (e: any) {
         return { error: e?.message || 'Gagal mengubah transaksi' };
       }
-    } else {
-      const oldTx = transactions.find((t) => t.id === id);
-      if (!oldTx) return { error: 'Transaksi tidak ditemukan' };
-
-      const updatedTx = { ...oldTx, ...updates, updated_at: new Date().toISOString() };
-      const updatedTxs = transactions.map((t) => (t.id === id ? updatedTx : t));
-      setTransactions(updatedTxs);
-      localStorage.setItem(LOCAL_TX_KEY, JSON.stringify(updatedTxs));
-
-      const updatedAccounts = accounts.map((acc) => {
-        let newBalance = Number(acc.current_balance);
-        if (acc.id === oldTx.account_id) {
-          newBalance += oldTx.type === 'income' ? -Number(oldTx.amount) : Number(oldTx.amount);
-        }
-        if (acc.id === updatedTx.account_id) {
-          newBalance += updatedTx.type === 'income' ? Number(updatedTx.amount) : -Number(updatedTx.amount);
-        }
-        return { ...acc, current_balance: newBalance };
-      });
-
-      setAccounts(updatedAccounts);
-      localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(updatedAccounts));
-      return {};
     }
+    return { error: 'Koneksi database belum tersedia' };
   };
 
   // Delete Transaction
   const deleteTransaction = async (id: string): Promise<{ error?: string }> => {
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         const { error } = await supabase.from('transactions').delete().eq('id', id);
         if (error) return { error: error.message };
@@ -658,25 +573,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (e: any) {
         return { error: e?.message || 'Gagal menghapus transaksi' };
       }
-    } else {
-      const oldTx = transactions.find((t) => t.id === id);
-      if (!oldTx) return { error: 'Transaksi tidak ditemukan' };
-
-      const updatedTxs = transactions.filter((t) => t.id !== id);
-      setTransactions(updatedTxs);
-      localStorage.setItem(LOCAL_TX_KEY, JSON.stringify(updatedTxs));
-
-      const updatedAccounts = accounts.map((acc) => {
-        if (acc.id === oldTx.account_id) {
-          const delta = oldTx.type === 'income' ? -Number(oldTx.amount) : Number(oldTx.amount);
-          return { ...acc, current_balance: Number(acc.current_balance) + delta };
-        }
-        return acc;
-      });
-      setAccounts(updatedAccounts);
-      localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(updatedAccounts));
-      return {};
     }
+    return { error: 'Koneksi database belum tersedia' };
   };
 
   // ----------------------------------------------------------------------------
@@ -684,7 +582,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Distinct first-class entity. Does NOT change total family wealth.
   // ----------------------------------------------------------------------------
   const addTransfer = async (
-    data: Omit<Transfer, 'id' | 'created_at' | 'updated_at'>
+    data: Omit<Transfer, 'id' | 'family_id' | 'created_at' | 'updated_at'> & { family_id?: string }
   ): Promise<{ error?: string; transfer?: Transfer }> => {
     if (!family) return { error: 'Keluarga belum aktif' };
     if (data.from_account_id === data.to_account_id) {
@@ -707,7 +605,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       created_by: user?.id || null,
     };
 
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         if (!isUuid(payload.from_account_id) || !isUuid(payload.to_account_id)) {
           const validAccs = accounts.filter((a) => isUuid(a.id));
@@ -718,67 +616,24 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
         const { data: created, error } = await supabase.from('transfers').insert(payload).select().single();
         if (error || !created) return { error: error?.message || 'Gagal menyimpan transfer' };
-
-        const fromAcc = accounts.find((a) => a.id === data.from_account_id);
-        const toAcc = accounts.find((a) => a.id === data.to_account_id);
         await recordActivity(
           'transfer_created',
           'transfer',
-          `${profile?.full_name || 'Keluarga'} memindahkan dana`,
-          `Transfer Rp ${data.amount.toLocaleString('id-ID')} dari ${fromAcc?.name || 'Rekening Asal'} ke ${toAcc?.name || 'Rekening Tujuan'}`,
+          `${profile?.full_name || 'Keluarga'} membuat transfer antar rekening`,
+          `Rp ${data.amount.toLocaleString('id-ID')}`,
           created.id
         );
-
         await loadFinanceData();
         return { transfer: created as Transfer };
       } catch (e: any) {
         return { error: e?.message || 'Gagal menyimpan transfer' };
       }
-    } else {
-      const fromAcc = accounts.find((a) => a.id === data.from_account_id);
-      const toAcc = accounts.find((a) => a.id === data.to_account_id);
-
-      const newTrf: Transfer = {
-        ...payload,
-        id: `trf-${Date.now()}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        from_account_name: fromAcc?.name || 'Akun Asal',
-        to_account_name: toAcc?.name || 'Akun Tujuan',
-        creator_name: profile?.full_name || 'Anggota Keluarga',
-      };
-
-      const updatedTrfs = [newTrf, ...transfers];
-      setTransfers(updatedTrfs);
-      localStorage.setItem(LOCAL_TRF_KEY, JSON.stringify(updatedTrfs));
-
-      // Adjust from_account and to_account balances
-      const updatedAccounts = accounts.map((acc) => {
-        if (acc.id === data.from_account_id) {
-          return { ...acc, current_balance: Number(acc.current_balance) - Number(data.amount) };
-        }
-        if (acc.id === data.to_account_id) {
-          return { ...acc, current_balance: Number(acc.current_balance) + Number(data.amount) };
-        }
-        return acc;
-      });
-      setAccounts(updatedAccounts);
-      localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(updatedAccounts));
-
-      await recordActivity(
-        'transfer_created',
-        'transfer',
-        `${profile?.full_name || 'Keluarga'} memindahkan dana`,
-        `Transfer Rp ${data.amount.toLocaleString('id-ID')} dari ${fromAcc?.name || 'Rekening Asal'} ke ${toAcc?.name || 'Rekening Tujuan'}`,
-        newTrf.id
-      );
-
-      return { transfer: newTrf };
     }
+    return { error: 'Koneksi database belum tersedia' };
   };
 
   const deleteTransfer = async (id: string): Promise<{ error?: string }> => {
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         const { error } = await supabase.from('transfers').delete().eq('id', id);
         if (error) return { error: error.message };
@@ -787,35 +642,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (e: any) {
         return { error: e?.message || 'Gagal menghapus transfer' };
       }
-    } else {
-      const oldTrf = transfers.find((t) => t.id === id);
-      if (!oldTrf) return { error: 'Data transfer tidak ditemukan' };
-
-      const updatedTrfs = transfers.filter((t) => t.id !== id);
-      setTransfers(updatedTrfs);
-      localStorage.setItem(LOCAL_TRF_KEY, JSON.stringify(updatedTrfs));
-
-      // Reverse account balances
-      const updatedAccounts = accounts.map((acc) => {
-        if (acc.id === oldTrf.from_account_id) {
-          return { ...acc, current_balance: Number(acc.current_balance) + Number(oldTrf.amount) };
-        }
-        if (acc.id === oldTrf.to_account_id) {
-          return { ...acc, current_balance: Number(acc.current_balance) - Number(oldTrf.amount) };
-        }
-        return acc;
-      });
-      setAccounts(updatedAccounts);
-      localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(updatedAccounts));
-      return {};
     }
+    return { error: 'Koneksi database belum tersedia' };
   };
 
   // ----------------------------------------------------------------------------
   // Recurring Transactions (Phase 3)
   // ----------------------------------------------------------------------------
   const addRecurringTransaction = async (
-    data: Omit<RecurringTransaction, 'id' | 'created_at' | 'updated_at'>
+    data: Omit<RecurringTransaction, 'id' | 'family_id' | 'created_at' | 'updated_at'> & { family_id?: string }
   ): Promise<{ error?: string; recurring?: RecurringTransaction }> => {
     if (!family) return { error: 'Keluarga belum aktif' };
 
@@ -832,7 +667,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       created_by: user?.id || null,
     };
 
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         const { data: created, error } = await supabase.from('recurring_transactions').insert(payload).select().single();
         if (error || !created) return { error: error?.message || 'Gagal menyimpan transaksi berulang' };
@@ -841,23 +676,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (e: any) {
         return { error: e?.message || 'Gagal menyimpan transaksi berulang' };
       }
-    } else {
-      const newRec: RecurringTransaction = {
-        ...payload,
-        id: `rec-${Date.now()}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      const updated = [newRec, ...recurringTransactions];
-      setRecurringTransactions(updated);
-      localStorage.setItem(LOCAL_REC_KEY, JSON.stringify(updated));
-      return { recurring: newRec };
     }
+    return { error: 'Koneksi database belum tersedia' };
   };
 
   const toggleRecurringActive = async (id: string, isActive: boolean): Promise<{ error?: string }> => {
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         const { error } = await supabase.from('recurring_transactions').update({ is_active: isActive }).eq('id', id);
         if (error) return { error: error.message };
@@ -866,16 +690,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (e: any) {
         return { error: e?.message || 'Gagal memperbarui status transaksi berulang' };
       }
-    } else {
-      const updated = recurringTransactions.map((r) => (r.id === id ? { ...r, is_active: isActive } : r));
-      setRecurringTransactions(updated);
-      localStorage.setItem(LOCAL_REC_KEY, JSON.stringify(updated));
-      return {};
     }
+    return { error: 'Koneksi database belum tersedia' };
   };
 
   const deleteRecurringTransaction = async (id: string): Promise<{ error?: string }> => {
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         const { error } = await supabase.from('recurring_transactions').delete().eq('id', id);
         if (error) return { error: error.message };
@@ -884,19 +704,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (e: any) {
         return { error: e?.message || 'Gagal menghapus transaksi berulang' };
       }
-    } else {
-      const updated = recurringTransactions.filter((r) => r.id !== id);
-      setRecurringTransactions(updated);
-      localStorage.setItem(LOCAL_REC_KEY, JSON.stringify(updated));
-      return {};
     }
+    return { error: 'Koneksi database belum tersedia' };
   };
 
   // ----------------------------------------------------------------------------
   // Transaction Templates (Phase 3)
   // ----------------------------------------------------------------------------
   const addTemplate = async (
-    data: Omit<TransactionTemplate, 'id' | 'created_at' | 'updated_at'>
+    data: Omit<TransactionTemplate, 'id' | 'family_id' | 'created_at' | 'updated_at'> & { family_id?: string }
   ): Promise<{ error?: string; template?: TransactionTemplate }> => {
     if (!family) return { error: 'Keluarga belum aktif' };
 
@@ -913,7 +729,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       created_by: user?.id || null,
     };
 
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         const { data: created, error } = await supabase.from('transaction_templates').insert(payload).select().single();
         if (error || !created) return { error: error?.message || 'Gagal menyimpan template' };
@@ -922,22 +738,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (e: any) {
         return { error: e?.message || 'Gagal menyimpan template' };
       }
-    } else {
-      const newTpl: TransactionTemplate = {
-        ...payload,
-        id: `tpl-${Date.now()}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      const updated = [newTpl, ...templates];
-      setTemplates(updated);
-      localStorage.setItem(LOCAL_TPL_KEY, JSON.stringify(updated));
-      return { template: newTpl };
     }
+    return { error: 'Koneksi database belum tersedia' };
   };
 
   const deleteTemplate = async (id: string): Promise<{ error?: string }> => {
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         const { error } = await supabase.from('transaction_templates').delete().eq('id', id);
         if (error) return { error: error.message };
@@ -946,19 +752,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (e: any) {
         return { error: e?.message || 'Gagal menghapus template' };
       }
-    } else {
-      const updated = templates.filter((t) => t.id !== id);
-      setTemplates(updated);
-      localStorage.setItem(LOCAL_TPL_KEY, JSON.stringify(updated));
-      return {};
     }
+    return { error: 'Koneksi database belum tersedia' };
   };
 
   // ----------------------------------------------------------------------------
   // Notifications & Preferences (Phase 3)
   // ----------------------------------------------------------------------------
   const markNotificationAsRead = async (id: string): Promise<void> => {
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         await supabase.from('notifications').update({ is_read: true }).eq('id', id);
       } catch (e) {
@@ -971,7 +773,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const markAllNotificationsAsRead = async (): Promise<void> => {
-    if (isSupabaseConfigured && !isDemoMode && family?.id) {
+    if (isSupabaseConfigured && family?.id) {
       try {
         await supabase.from('notifications').update({ is_read: true }).eq('family_id', family.id);
       } catch (e) {
@@ -988,7 +790,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setNotificationPreferences(updated);
     localStorage.setItem(LOCAL_PREF_KEY, JSON.stringify(updated));
 
-    if (isSupabaseConfigured && !isDemoMode && user?.id && family?.id) {
+    if (isSupabaseConfigured && user?.id && family?.id) {
       try {
         await supabase.from('notification_preferences').upsert({
           user_id: user.id,
@@ -1006,7 +808,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Accounts, Goals & Budgets (Phase 1)
   // ----------------------------------------------------------------------------
   const addAccount = async (
-    data: Omit<Account, 'id' | 'created_at' | 'updated_at'>
+    data: Omit<Account, 'id' | 'family_id' | 'created_at' | 'updated_at'> & { family_id?: string }
   ): Promise<{ error?: string; account?: Account }> => {
     if (!family) return { error: 'Keluarga belum aktif' };
 
@@ -1016,7 +818,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       current_balance: data.initial_balance || 0,
     };
 
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         const { data: created, error } = await supabase.from('accounts').insert(payload).select().single();
         if (error || !created) return { error: error?.message || 'Gagal menambah rekening' };
@@ -1025,22 +827,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (err: any) {
         return { error: err?.message || 'Terjadi kesalahan' };
       }
-    } else {
-      const newAcc: Account = {
-        ...payload,
-        id: `acc-${Date.now()}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      const updatedAccounts = [...accounts, newAcc];
-      setAccounts(updatedAccounts);
-      localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(updatedAccounts));
-      return { account: newAcc };
     }
+    return { error: 'Koneksi database belum tersedia' };
   };
 
   const updateAccount = async (id: string, updates: Partial<Account>): Promise<{ error?: string }> => {
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         const { error } = await supabase.from('accounts').update({
           ...updates,
@@ -1052,12 +844,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (err: any) {
         return { error: err?.message || 'Gagal mengubah akun' };
       }
-    } else {
-      const updatedAccounts = accounts.map((a) => (a.id === id ? { ...a, ...updates, updated_at: new Date().toISOString() } : a));
-      setAccounts(updatedAccounts);
-      localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(updatedAccounts));
-      return {};
     }
+    return { error: 'Koneksi database belum tersedia' };
   };
 
   const deleteAccount = async (id: string): Promise<{ error?: string }> => {
@@ -1070,7 +858,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       };
     }
 
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         const { error } = await supabase.from('accounts').delete().eq('id', id);
         if (error) return { error: error.message };
@@ -1079,16 +867,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (err: any) {
         return { error: err?.message || 'Gagal menghapus akun' };
       }
-    } else {
-      const updatedAccounts = accounts.filter((a) => a.id !== id);
-      setAccounts(updatedAccounts);
-      localStorage.setItem(LOCAL_ACC_KEY, JSON.stringify(updatedAccounts));
-      return {};
     }
+    return { error: 'Koneksi database belum tersedia' };
   };
 
   const addGoal = async (
-    data: Omit<Goal, 'id' | 'created_at' | 'updated_at'>
+    data: Omit<Goal, 'id' | 'family_id' | 'created_at' | 'updated_at'> & { family_id?: string }
   ): Promise<{ error?: string; goal?: Goal }> => {
     if (!family) return { error: 'Keluarga belum aktif' };
 
@@ -1098,7 +882,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       created_by: user?.id || null,
     };
 
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         const { data: created, error } = await supabase.from('goals').insert(payload).select().single();
         if (error || !created) return { error: error?.message || 'Gagal menambah target' };
@@ -1108,19 +892,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (err: any) {
         return { error: err?.message || 'Terjadi kesalahan' };
       }
-    } else {
-      const newGoal: Goal = {
-        ...payload,
-        id: `goal-${Date.now()}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      const updatedGoals = [...goals, newGoal];
-      setGoals(updatedGoals);
-      localStorage.setItem(LOCAL_GOAL_KEY, JSON.stringify(updatedGoals));
-      await recordActivity('goal_created', 'goal', `${profile?.full_name || 'Keluarga'} membuat target baru`, data.name, newGoal.id);
-      return { goal: newGoal };
     }
+    return { error: 'Koneksi database belum tersedia' };
   };
 
   const updateGoalAmount = async (id: string, additionalAmount: number): Promise<{ error?: string }> => {
@@ -1128,7 +901,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!target) return { error: 'Target impian tidak ditemukan' };
     const newAmount = Number(target.current_amount) + Number(additionalAmount);
 
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         const { error } = await supabase.from('goals').update({ current_amount: newAmount, updated_at: new Date().toISOString() }).eq('id', id);
         if (error) return { error: error.message };
@@ -1138,13 +911,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (e: any) {
         return { error: e?.message || 'Gagal mengupdate target' };
       }
-    } else {
-      const updatedGoals = goals.map((g) => (g.id === id ? { ...g, current_amount: newAmount, updated_at: new Date().toISOString() } : g));
-      setGoals(updatedGoals);
-      localStorage.setItem(LOCAL_GOAL_KEY, JSON.stringify(updatedGoals));
-      await recordActivity('goal_updated', 'goal', `${profile?.full_name || 'Keluarga'} menambah tabungan target`, `${target.name} (+Rp ${additionalAmount.toLocaleString('id-ID')})`, id);
-      return {};
     }
+    return { error: 'Koneksi database belum tersedia' };
   };
 
   const setCategoryBudget = async (categoryId: string, amount: number): Promise<{ error?: string }> => {
@@ -1154,7 +922,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
 
-    if (isSupabaseConfigured && !isDemoMode) {
+    if (isSupabaseConfigured) {
       try {
         const { error } = await supabase.from('budgets').upsert(
           {
@@ -1173,32 +941,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (e: any) {
         return { error: e?.message || 'Gagal menyimpan anggaran' };
       }
-    } else {
-      const existing = budgets.find((b) => b.category_id === categoryId && b.month === month && b.year === year);
-      let updated: Budget[];
-      if (existing) {
-        updated = budgets.map((b) => (b.id === existing.id ? { ...b, amount, updated_at: new Date().toISOString() } : b));
-      } else {
-        const cat = categories.find((c) => c.id === categoryId);
-        const newBudget: Budget = {
-          id: `bgt-${Date.now()}`,
-          family_id: family.id,
-          category_id: categoryId,
-          amount,
-          month,
-          year,
-          category_name: cat?.name,
-          category_icon: cat?.icon,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        updated = [...budgets, newBudget];
-      }
-
-      setBudgets(updated);
-      localStorage.setItem(LOCAL_BUDGET_KEY, JSON.stringify(updated));
-      return {};
     }
+    return { error: 'Koneksi database belum tersedia' };
   };
 
   return (

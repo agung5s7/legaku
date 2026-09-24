@@ -56,7 +56,7 @@ export const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
       setIsProcessing(false);
       onExtractionComplete(result);
     } catch (err: any) {
-      setErrorMessage('Terjadi kendala saat membaca struk. Silakan coba foto ulang.');
+      setErrorMessage(err.message || 'Terjadi kendala saat membaca struk. Silakan coba foto ulang.');
       setIsProcessing(false);
     }
   };

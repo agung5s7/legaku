@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useFamily } from '../../context/FamilyContext';
 import { formatRupiah, formatShortRupiah } from '../../utils/formatters';
 import { CategoryIcon } from '../../components/ui/CategoryIcon';
+import { BrandIcon } from '../../components/ui/BrandIcon';
 import { TransactionDetailModal } from '../transactions/TransactionDetailModal';
 import { Transaction } from '../../types';
 import {
@@ -24,12 +25,13 @@ import {
   HeartPulse,
   Compass,
   Mic,
+  Wallet,
 } from 'lucide-react';
 import { analyzeFinancialPatterns } from '../../services/patterns/patternEngine';
 
 interface DashboardViewProps {
   onOpenCatat: (mode?: 'manual' | 'receipt' | 'voice' | 'transfer') => void;
-  onNavigateTab: (tab: 'home' | 'ai' | 'goal' | 'saya' | 'review') => void;
+  onNavigateTab: (tab: 'home' | 'ai' | 'goal' | 'saya' | 'review' | 'accounts') => void;
   onViewAllTransactions: () => void;
   onOpenNotifications?: () => void;
   onOpenHealthCheck?: () => void;
@@ -46,6 +48,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const { profile } = useAuth();
   const { family, members } = useFamily();
   const {
+    accounts,
     totalBalance,
     incomeThisMonth,
     expenseThisMonth,
@@ -279,6 +282,45 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {formatRupiah(remainingCashFlow)}
             </span>
           </div>
+        </div>
+      </div>
+
+      {/* 5.5 Accounts Overview Card */}
+      <div className="bg-white border border-[#E5E7EB] rounded-3xl p-5 shadow-subtle space-y-3.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Wallet className="w-4 h-4 text-[#144D3A]" />
+            <h3 className="text-sm font-bold text-[#1F2937]">Rekening & Dompet</h3>
+          </div>
+          <button
+            onClick={() => onNavigateTab('accounts')}
+            className="text-xs font-semibold text-[#144D3A] hover:text-[#2E7D61] flex items-center gap-0.5 cursor-pointer"
+          >
+            Kelola <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div className="space-y-2.5">
+          {accounts.length === 0 ? (
+            <div className="py-4 text-center text-xs text-[#6B7280]">
+              Belum ada rekening/dompet. Klik "Kelola" untuk menambahkan.
+            </div>
+          ) : (
+            accounts.slice(0, 3).map((acc) => (
+              <div key={acc.id} onClick={() => onNavigateTab('accounts')} className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-[#E8F2EC]/40 border border-transparent hover:border-[#E8F2EC] transition-colors cursor-pointer group">
+                <div className="flex items-center gap-3">
+                  <BrandIcon name={acc.name} type={acc.type} className="w-9 h-9" />
+                  <div>
+                    <h4 className="text-sm font-bold text-[#1F2937] group-hover:text-[#144D3A] transition-colors">{acc.name}</h4>
+                    <p className="text-[10px] text-[#6B7280] uppercase font-semibold">{acc.type === 'bank' ? 'Bank' : acc.type === 'ewallet' ? 'E-Wallet' : acc.type === 'cash' ? 'Tunai' : 'Lainnya'}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm font-bold text-[#144D3A]">{formatRupiah(acc.current_balance)}</span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

@@ -2,100 +2,63 @@ import { Category, ReceiptExtractionResult, ReceiptItem } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 /**
- * Client-Side Heuristic Receipt Parser Fallback
- * Extracts structured data from receipt image context, simulated OCR or edge function
+ * Validates and compresses the receipt image before upload.
  */
-export async function parseReceiptClientFallback(
-  file: File,
-  categories: Category[]
-): Promise<ReceiptExtractionResult> {
-  // Simulate intelligent image OCR delay
-  await new Promise((resolve) => setTimeout(resolve, 1400));
-
-  const fileName = file.name.toLowerCase();
-  const imageUrl = URL.createObjectURL(file);
-
-  // Default fallback mock values modeled around realistic Indonesian retail receipts
-  let merchant = 'Indomaret';
-  let totalAmount = 187500;
-  let items: ReceiptItem[] = [
-    { name: 'AQUA 600ML', amount: 6000, quantity: 2 },
-    { name: 'INDOMIE GORENG', amount: 14500, quantity: 5 },
-    { name: 'BERAS 5KG', amount: 64000, quantity: 1 },
-    { name: 'MINYAK GORENG 2L', amount: 28000, quantity: 1 },
-    { name: 'TELUR AYAM 1KG', amount: 27000, quantity: 1 },
-    { name: 'SABUN MANDI', amount: 18000, quantity: 2 },
-    { name: 'PASTA GIGI', amount: 30000, quantity: 1 },
-  ];
-
-  if (fileName.includes('superindo') || fileName.includes('sayur') || fileName.includes('buah')) {
-    merchant = 'Superindo Supermarket';
-    totalAmount = 320000;
-    items = [
-      { name: 'Apel Fuji 1kg', amount: 48000 },
-      { name: 'Susu UHT 1L', amount: 38000 },
-      { name: 'Daging Sapi Segar 500g', amount: 75000 },
-      { name: 'Sayur Bayam & Wortel', amount: 24000 },
-      { name: 'Minyak Goreng', amount: 35000 },
-      { name: 'Kebutuhan Dapur', amount: 100000 },
-    ];
-  } else if (fileName.includes('kopi') || fileName.includes('starbucks') || fileName.includes('cafe')) {
-    merchant = 'Starbucks Coffee';
-    totalAmount = 98000;
-    items = [
-      { name: 'Caffe Latte Grande', amount: 58000 },
-      { name: 'Butter Croissant', amount: 40000 },
-    ];
-  } else if (fileName.includes('spbu') || fileName.includes('bensin') || fileName.includes('pertamina')) {
-    merchant = 'SPBU Pertamina';
-    totalAmount = 150000;
-    items = [{ name: 'Pertalite / Pertamax', amount: 150000 }];
-  } else if (fileName.includes('alfamart')) {
-    merchant = 'Alfamart';
-    totalAmount = 85500;
-    items = [
-      { name: 'Roti Gandum', amount: 19500 },
-      { name: 'Kopi Kenangan Botol', amount: 18000 },
-      { name: 'Air Mineral 1.5L', amount: 8000 },
-      { name: 'Snack Keripik', amount: 40000 },
-    ];
+async function compressImage(file: File): Promise<File> {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error('Tipe file tidak didukung. Gunakan format JPG, PNG, atau WEBP.');
   }
 
-  // Determine Category Match
-  let matchedCat: Category | undefined;
-  if (merchant.includes('Starbucks') || merchant.includes('Coffee') || merchant.includes('Resto')) {
-    matchedCat = categories.find((c) => c.name.toLowerCase().includes('makan'));
-  } else if (merchant.includes('SPBU')) {
-    matchedCat = categories.find((c) => c.name.toLowerCase().includes('transport'));
-  } else {
-    matchedCat = categories.find(
-      (c) => c.name.toLowerCase().includes('rumah tangga') || c.name.toLowerCase().includes('belanja')
-    );
-  }
+  // max dimension 2000px, target size ~1MB
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 2000;
+        
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
 
-  if (!matchedCat && categories.length > 0) {
-    matchedCat = categories[0];
-  }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          return reject(new Error('Gagal memproses gambar.'));
+        }
+        ctx.drawImage(img, 0, 0, width, height);
 
-  const todayStr = new Date().toISOString().split('T')[0];
-
-  return {
-    merchant_name: merchant,
-    total_amount: totalAmount,
-    transaction_date: todayStr,
-    transaction_time: '14:32',
-    suggested_category_id: matchedCat?.id,
-    suggested_category_name: matchedCat?.name || 'Rumah Tangga',
-    items,
-    confidence: {
-      merchant: 0.98,
-      amount: 0.96,
-      date: 0.92,
-      category: 0.88,
-    },
-    is_confident: true,
-    imageUrl,
-  };
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return reject(new Error('Gagal mengompres gambar.'));
+            const ext = file.name.split('.').pop() || 'jpg';
+            const compressedFile = new File([blob], `receipt.${ext}`, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            resolve(compressedFile);
+          },
+          'image/jpeg',
+          0.85
+        );
+      };
+      img.onerror = () => reject(new Error('File gambar rusak atau tidak dapat dibaca.'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Gagal membaca file gambar.'));
+    reader.readAsDataURL(file);
+  });
 }
 
 /**
@@ -106,48 +69,89 @@ export async function extractReceiptInformation(
   familyId: string,
   categories: Category[]
 ): Promise<ReceiptExtractionResult> {
-  // Check if real backend Edge Function is deployed & reachable
-  if (isSupabaseConfigured) {
-    try {
-      const fileName = `${familyId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-      // Upload to private receipts bucket
-      const { data: uploadData, error: uploadErr } = await supabase.storage
-        .from('receipts')
-        .upload(fileName, file);
-
-      if (!uploadErr && uploadData) {
-        // Call Edge Function
-        const { data: edgeData, error: fnErr } = await supabase.functions.invoke('process-receipt', {
-          body: {
-            storagePath: uploadData.path,
-            familyId,
-          },
-        });
-
-        if (!fnErr && edgeData && edgeData.merchant_name) {
-          const matchedCat = categories.find(
-            (c) => c.name.toLowerCase() === edgeData.suggested_category?.toLowerCase()
-          );
-
-          return {
-            merchant_name: edgeData.merchant_name,
-            total_amount: edgeData.total_amount || 0,
-            transaction_date: edgeData.transaction_date || new Date().toISOString().split('T')[0],
-            transaction_time: edgeData.transaction_time,
-            suggested_category_id: matchedCat?.id || categories[0]?.id,
-            suggested_category_name: matchedCat?.name || edgeData.suggested_category,
-            items: edgeData.items || [],
-            confidence: edgeData.confidence || { merchant: 0.95, amount: 0.95, date: 0.9, category: 0.85 },
-            is_confident: true,
-            imageUrl: URL.createObjectURL(file),
-          };
-        }
-      }
-    } catch (err) {
-      console.warn('Edge Function OCR unavailable, falling back to local extractor:', err);
-    }
+  if (!isSupabaseConfigured) {
+    throw new Error('Sistem backend belum terkonfigurasi dengan benar.');
   }
 
-  // Graceful high-fidelity local OCR simulation fallback
-  return parseReceiptClientFallback(file, categories);
+  // 1. Compress Image
+  const compressedFile = await compressImage(file);
+  
+  if (compressedFile.size > 5 * 1024 * 1024) {
+    throw new Error('Ukuran gambar masih terlalu besar setelah dikompres (Maksimal 5MB).');
+  }
+
+  // 2. Upload to private receipts bucket
+  const fileName = `${familyId}/${Date.now()}-${compressedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+  
+  const { data: uploadData, error: uploadErr } = await supabase.storage
+    .from('receipts')
+    .upload(fileName, compressedFile);
+
+  if (uploadErr || !uploadData) {
+    throw new Error('Gagal mengunggah gambar struk. Periksa koneksi internet Anda.');
+  }
+
+  // 3. Call Edge Function
+  const { data: edgeData, error: fnErr } = await supabase.functions.invoke('process-receipt', {
+    body: {
+      storagePath: uploadData.path,
+      familyId,
+    },
+  });
+
+  if (fnErr) {
+    console.error('Edge function error:', fnErr);
+    throw new Error('Struk belum berhasil dibaca. Pastikan foto cukup terang, tidak blur, dan seluruh struk terlihat.');
+  }
+
+  if (edgeData?.error) {
+    console.error('Edge function returned error:', edgeData.error);
+    throw new Error(edgeData.error || 'Struk belum berhasil dibaca. Pastikan foto cukup terang, tidak blur, dan seluruh struk terlihat.');
+  }
+
+  // 4. Map Result
+  if (!edgeData || (!edgeData.merchant_name && !edgeData.total_amount && (!edgeData.items || edgeData.items.length === 0))) {
+     throw new Error('Struk belum berhasil dibaca. Pastikan foto cukup terang, tidak blur, dan seluruh struk terlihat.');
+  }
+
+  let matchedCatId = categories[0]?.id;
+  let matchedCatName = categories[0]?.name || 'Belum Terkategori';
+
+  if (edgeData.category_hint) {
+    const matched = categories.find(
+      (c) => c.name.toLowerCase().includes(edgeData.category_hint.toLowerCase())
+    );
+    if (matched) {
+      matchedCatId = matched.id;
+      matchedCatName = matched.name;
+    }
+  }
+  
+  // Convert items format slightly if needed
+  const items: ReceiptItem[] = (edgeData.items || []).map((item: any) => ({
+    name: item.name,
+    quantity: item.quantity || 1,
+    amount: item.total_price || item.unit_price || 0
+  }));
+
+  // Construct confidence object
+  const conf = {
+    merchant: edgeData.overall_confidence || 0.8,
+    amount: edgeData.overall_confidence || 0.8,
+    date: edgeData.overall_confidence || 0.8,
+    category: edgeData.overall_confidence || 0.8
+  };
+
+  return {
+    merchant_name: edgeData.merchant_name || 'Tidak diketahui',
+    total_amount: edgeData.total_amount || 0,
+    transaction_date: edgeData.transaction_date || new Date().toISOString().split('T')[0],
+    transaction_time: edgeData.transaction_time || '12:00',
+    suggested_category_id: matchedCatId,
+    suggested_category_name: matchedCatName,
+    items,
+    confidence: conf,
+    is_confident: edgeData.overall_confidence ? edgeData.overall_confidence >= 0.8 : true,
+    imageUrl: URL.createObjectURL(compressedFile),
+  };
 }

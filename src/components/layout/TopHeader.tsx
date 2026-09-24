@@ -11,7 +11,7 @@ interface TopHeaderProps {
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({ onOpenInvite, onOpenNotifications }) => {
-  const { profile, user, switchDemoUser, isDemoMode } = useAuth();
+  const { profile, user } = useAuth();
   const { family, members } = useFamily();
   const { notifications } = useFinance();
 
@@ -32,11 +32,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onOpenInvite, onOpenNotifi
               <h1 className="text-sm sm:text-base font-bold text-[#144D3A] tracking-tight leading-tight truncate">
                 {family?.name || 'LEGAKU'}
               </h1>
-              {isDemoMode && (
-                <span className="hidden md:inline-flex text-[10px] bg-[#E8F2EC] text-[#144D3A] font-semibold px-2 py-0.5 rounded-full border border-[#2E7D61]/20 shrink-0">
-                  Demo
-                </span>
-              )}
             </div>
             <p className="text-[11px] sm:text-xs text-[#6B7280] flex items-center gap-1 leading-none mt-0.5 truncate">
               <span className="truncate">{profile?.full_name?.split(' ')[0] || 'Keluarga'}</span>
@@ -70,47 +65,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onOpenInvite, onOpenNotifi
             )}
           </button>
 
-          {/* Quick Demo Switcher if in demo mode */}
-          {isDemoMode && (
-            <>
-              {/* Mobile: Compact 1-tap user switcher */}
-              <button
-                onClick={() => switchDemoUser(profile?.full_name?.includes('Andi') ? 1 : 0)}
-                className="sm:hidden flex items-center gap-1 px-2.5 py-1.5 bg-[#E8F2EC] hover:bg-[#d8ece0] rounded-xl text-[11px] font-semibold text-[#144D3A] border border-[#2E7D61]/25 active:scale-95 shrink-0 transition-colors shadow-2xs"
-                title="Ketuk untuk beralih profil demo (Andi / Sinta)"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-[#2E7D61]" />
-                <span>{profile?.full_name?.includes('Andi') ? 'Andi' : 'Sinta'}</span>
-                <span className="text-[10px] text-[#2E7D61] font-bold">⇄</span>
-              </button>
-
-              {/* Desktop: Dual-pill switcher */}
-              <div className="hidden sm:flex items-center bg-[#E8F2EC] p-0.5 rounded-xl border border-[#E5E7EB] text-xs shrink-0">
-                <button
-                  onClick={() => switchDemoUser(0)}
-                  className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
-                    profile?.full_name?.includes('Andi')
-                      ? 'bg-white text-[#144D3A] shadow-xs font-semibold'
-                      : 'text-[#6B7280] hover:text-[#144D3A]'
-                  }`}
-                  title="Ganti ke Andi (Owner)"
-                >
-                  Andi
-                </button>
-                <button
-                  onClick={() => switchDemoUser(1)}
-                  className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-medium transition-all ${
-                    profile?.full_name?.includes('Sinta')
-                      ? 'bg-white text-[#144D3A] shadow-xs font-semibold'
-                      : 'text-[#6B7280] hover:text-[#144D3A]'
-                  }`}
-                  title="Ganti ke Sinta (Partner)"
-                >
-                  Sinta
-                </button>
-              </div>
-            </>
-          )}
 
           {/* Invite Partner button */}
           <button

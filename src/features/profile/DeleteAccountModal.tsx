@@ -12,7 +12,7 @@ interface DeleteAccountModalProps {
 }
 
 export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({ isOpen, onClose }) => {
-  const { user, logout, isDemoMode } = useAuth();
+  const { user, logout } = useAuth();
   const { family, members } = useFamily();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -32,7 +32,7 @@ export const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({ isOpen, 
     setErrorMessage('');
 
     try {
-      if (isSupabaseConfigured && !isDemoMode && user) {
+      if (isSupabaseConfigured && user) {
         const { error } = await supabase.rpc('delete_user_account');
         if (error) throw error;
       }

@@ -12,7 +12,7 @@ import { LeafMark } from './components/ui/Logo';
 import { Loader2 } from 'lucide-react';
 
 const MainContent: React.FC = () => {
-  const { user, loading, switchDemoUser } = useAuth();
+  const { user, loading } = useAuth();
   const [unauthView, setUnauthView] = useState<'welcome' | 'landing' | 'auth'>('welcome');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
@@ -43,9 +43,6 @@ const MainContent: React.FC = () => {
               setAuthMode('login');
               setUnauthView('auth');
             }}
-            onStartDemo={() => {
-              switchDemoUser(0);
-            }}
             onViewLanding={() => {
               setUnauthView('landing');
             }}
@@ -65,9 +62,6 @@ const MainContent: React.FC = () => {
             onStartLogin={() => {
               setAuthMode('login');
               setUnauthView('auth');
-            }}
-            onStartDemo={() => {
-              switchDemoUser(0);
             }}
             onBackToWelcome={() => {
               setUnauthView('welcome');

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Sparkles, Heart, Users, Compass, ArrowRight, CheckCircle2, ShieldCheck, ChevronRight, X } from 'lucide-react';
+import { Sparkles, Heart, Users, Compass, ArrowRight, CheckCircle2, ShieldCheck, ChevronRight, X, Loader2 } from 'lucide-react';
 import { trackEvent } from '../../services/analytics/productAnalytics';
 import { Logo } from '../../components/ui/Logo';
+import { useFinance } from '../../context/FinanceContext';
 
 interface WelcomeOnboardingProps {
   isOpen: boolean;
-  onComplete: (useDemoData: boolean) => void;
+  onComplete: () => void;
   onClose?: () => void;
 }
 
@@ -14,20 +15,22 @@ export const WelcomeOnboarding: React.FC<WelcomeOnboardingProps> = ({
   onComplete,
   onClose,
 }) => {
+  const { addGoal, goals } = useFinance();
   const [step, setStep] = useState<number>(1);
-  const [selectedGoals, setSelectedGoals] = useState<string[]>(['Dana Darurat Tenang']);
+  const [selectedGoals, setSelectedGoals] = useState<string[]>(['🕊️ Hidup Bebas Beban Utang', '🛡️ Dana Darurat Tenang']);
   const [familyType, setFamilyType] = useState<'couple' | 'family' | 'personal'>('couple');
   const [partnerName, setPartnerName] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
   const goalOptions = [
-    { id: 'emergency', label: '🛡️ Dana Darurat Tenang', desc: 'Minimal 3-6 bulan pengeluaran' },
-    { id: 'home', label: '🏡 Rumah / Tempat Tinggal', desc: 'DP atau renovasi impian' },
-    { id: 'education', label: '🎓 Pendidikan Anak', desc: 'Investasi masa depan buah hati' },
-    { id: 'vacation', label: '✈️ Liburan Keluarga', desc: 'Momen berharga melepas penat' },
-    { id: 'debt_free', label: '🕊️ Hidup Bebas Beban Utang', desc: 'Pernafasan finansial lebih plong' },
-    { id: 'vehicle', label: '🚗 Kendaraan Keluarga', desc: 'Mobilitas aman dan nyaman' },
+    { id: 'debt_free', icon: '🕊️', label: '🕊️ Hidup Bebas Beban Utang', name: 'Hidup Bebas Beban Utang', desc: 'Pernafasan finansial lebih plong', defaultTarget: 20000000 },
+    { id: 'emergency', icon: '🛡️', label: '🛡️ Dana Darurat Tenang', name: 'Dana Darurat Tenang', desc: 'Minimal 3-6 bulan pengeluaran', defaultTarget: 15000000 },
+    { id: 'home', icon: '🏡', label: '🏡 Rumah / Tempat Tinggal', name: 'Rumah / Tempat Tinggal', desc: 'DP atau renovasi impian', defaultTarget: 50000000 },
+    { id: 'education', icon: '🎓', label: '🎓 Pendidikan Anak', name: 'Pendidikan Anak', desc: 'Investasi masa depan buah hati', defaultTarget: 25000000 },
+    { id: 'vacation', icon: '✈️', label: '✈️ Liburan Keluarga', name: 'Liburan Keluarga', desc: 'Momen berharga melepas penat', defaultTarget: 10000000 },
+    { id: 'vehicle', icon: '🚗', label: '🚗 Kendaraan Keluarga', name: 'Kendaraan Keluarga', desc: 'Mobilitas aman dan nyaman', defaultTarget: 30000000 },
   ];
 
   const toggleGoal = (label: string) => {
@@ -38,14 +41,48 @@ export const WelcomeOnboarding: React.FC<WelcomeOnboardingProps> = ({
     }
   };
 
-  const handleFinish = (useDemo: boolean) => {
-    trackEvent('onboarding_completed', {
-      family_type: familyType,
-      goals_count: selectedGoals.length,
-      used_demo: useDemo,
-    });
-    localStorage.setItem('legaku_onboarded', 'true');
-    onComplete(useDemo);
+  const handleFinish = async () => {
+    setIsSubmitting(true);
+    try {
+      // Set target date 1 year from now
+      const oneYearLater = new Date();
+      oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+      const targetDateStr = oneYearLater.toISOString().split('T')[0];
+
+      // Save each selected goal into Supabase database via addGoal
+      for (const selected of selectedGoals) {
+        const option = goalOptions.find(o => o.label === selected || o.name === selected || o.id === selected);
+        const goalName = option ? option.name : selected.replace(/^[^\w\s]+\s*/, '');
+        const targetAmount = option ? option.defaultTarget : 10000000;
+        const description = option ? option.desc : 'Dibuat otomatis dari onboarding';
+
+        // Prevent duplicate goals with same name
+        const exists = goals.some(g => g.name.toLowerCase() === goalName.toLowerCase());
+        if (!exists) {
+          await addGoal({
+            name: goalName,
+            target_amount: targetAmount,
+            current_amount: 0,
+            target_date: targetDateStr,
+            description: description,
+          });
+        }
+      }
+
+      trackEvent('onboarding_completed', {
+        family_type: familyType,
+        goals_count: selectedGoals.length,
+        used_demo: false,
+      });
+      localStorage.setItem('legaku_onboarded', 'true');
+      onComplete();
+    } catch (err) {
+      console.error('Gagal menyimpan goals onboarding:', err);
+      localStorage.setItem('legaku_onboarded', 'true');
+      onComplete();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -63,7 +100,7 @@ export const WelcomeOnboarding: React.FC<WelcomeOnboardingProps> = ({
           )}
 
           <div className="flex items-center gap-2 mb-3">
-            {[1, 2, 3, 4].map(s => (
+            {[1, 2, 3].map(s => (
               <div
                 key={s}
                 className={`h-1.5 rounded-full transition-all duration-300 ${
@@ -72,7 +109,7 @@ export const WelcomeOnboarding: React.FC<WelcomeOnboardingProps> = ({
               />
             ))}
             <span className="text-[11px] font-semibold text-white/80 ml-auto uppercase tracking-wider">
-              Langkah {step} dari 4
+              Langkah {step} dari 3
             </span>
           </div>
 
@@ -80,13 +117,11 @@ export const WelcomeOnboarding: React.FC<WelcomeOnboardingProps> = ({
             {step === 1 && 'Selamat Datang di LEGAKU'}
             {step === 2 && 'Apa Fokus Impian Finansial Anda?'}
             {step === 3 && 'Finansial Bersama yang Tenang'}
-            {step === 4 && 'Mulai Pengalaman Finansial Anda'}
           </h2>
           <p className="text-white/80 text-xs mt-1 leading-relaxed">
             {step === 1 && 'Atur uang. Hidup lebih lega. Teman terpercaya keluarga Anda.'}
             {step === 2 && 'Pilih satu atau beberapa tujuan penting untuk keluarga Anda.'}
             {step === 3 && 'Uang bukan lagi sumber beban, melainkan ruang untuk bertumbuh bersama.'}
-            {step === 4 && 'Pilih cara Anda ingin memulai perjalanan hari ini.'}
           </p>
         </div>
 
@@ -142,7 +177,7 @@ export const WelcomeOnboarding: React.FC<WelcomeOnboardingProps> = ({
           {step === 2 && (
             <div className="space-y-3">
               <p className="text-xs text-slate-500">
-                Pilih impian yang ingin Anda wujudkan (bisa diubah kapan saja):
+                Pilih impian yang ingin Anda wujudkan. Pilihan ini akan otomatis dibuatkan targetnya di tab Impian:
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {goalOptions.map(opt => {
@@ -215,59 +250,6 @@ export const WelcomeOnboarding: React.FC<WelcomeOnboardingProps> = ({
             </div>
           )}
 
-          {/* STEP 4: FIRST VALUE MOMENT */}
-          {step === 4 && (
-            <div className="space-y-4">
-              <div className="text-center p-3">
-                <div className="w-12 h-12 rounded-full bg-[#E8F2EC] text-[#144D3A] flex items-center justify-center mx-auto mb-2 font-bold text-xl">
-                  ✨
-                </div>
-                <h4 className="text-sm font-bold text-[#1F2937]">Ruang Finansial Anda Sudah Siap!</h4>
-                <p className="text-xs text-[#6B7280] mt-1">
-                  Pilih cara Anda ingin menjelajahi dan merasakan kenyamanan LEGAKU.
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                {/* Option A: Demo Data */}
-                <button
-                  type="button"
-                  onClick={() => handleFinish(true)}
-                  className="w-full p-4 rounded-2xl border-2 border-[#144D3A] bg-[#E8F2EC]/60 hover:bg-[#E8F2EC] text-left transition-all group flex items-start gap-3.5 shadow-sm"
-                >
-                  <div className="w-9 h-9 rounded-xl bg-[#144D3A] text-white flex items-center justify-center font-bold text-sm shrink-0 mt-0.5">
-                    🚀
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-[#144D3A]">Eksplorasi dengan Data Nyata (Rekomendasi)</span>
-                      <span className="text-[10px] uppercase font-bold bg-[#144D3A] text-white px-2 py-0.5 rounded-full">Instan</span>
-                    </div>
-                    <p className="text-xs text-[#1F2937]/80 mt-1 leading-relaxed">
-                      Langsung coba AI Companion, analisis kesehatan finansial, simulasi impian, dan ringkasan bulanan dengan data simulasi keluarga.
-                    </p>
-                  </div>
-                </button>
-
-                {/* Option B: Empty slate */}
-                <button
-                  type="button"
-                  onClick={() => handleFinish(false)}
-                  className="w-full p-3.5 rounded-2xl border border-[#E5E7EB] bg-white hover:bg-[#F9FAF7] text-left transition-all flex items-start gap-3.5"
-                >
-                  <div className="w-9 h-9 rounded-xl bg-[#E8F2EC] text-[#144D3A] flex items-center justify-center font-bold text-sm shrink-0 mt-0.5">
-                    📝
-                  </div>
-                  <div className="flex-1">
-                    <span className="text-sm font-bold text-[#1F2937]">Mulai dari Lembar Bersih</span>
-                    <p className="text-xs text-[#6B7280] mt-0.5 leading-relaxed">
-                      Mulai mencatat transaksi dari nol secara mandiri sesuai dompet riil Anda.
-                    </p>
-                  </div>
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Footer controls */}
@@ -275,8 +257,9 @@ export const WelcomeOnboarding: React.FC<WelcomeOnboardingProps> = ({
           {step > 1 ? (
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={() => setStep(step - 1)}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-[#6B7280] hover:text-[#1F2937] transition-colors"
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-[#6B7280] hover:text-[#1F2937] transition-colors disabled:opacity-50"
             >
               Kembali
             </button>
@@ -284,7 +267,7 @@ export const WelcomeOnboarding: React.FC<WelcomeOnboardingProps> = ({
             <div />
           )}
 
-          {step < 4 ? (
+          {step < 3 ? (
             <button
               type="button"
               onClick={() => setStep(step + 1)}
@@ -293,9 +276,29 @@ export const WelcomeOnboarding: React.FC<WelcomeOnboardingProps> = ({
               Lanjutkan
               <ChevronRight size={16} />
             </button>
-          ) : null}
+          ) : (
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleFinish}
+              className="px-5 py-2.5 rounded-2xl bg-[#144D3A] text-white font-semibold text-xs hover:bg-[#2E7D61] transition-all flex items-center gap-1.5 shadow-sm ml-auto disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Menyiapkan Impian...</span>
+                </>
+              ) : (
+                <>
+                  <span>Selesai</span>
+                  <CheckCircle2 size={16} />
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 };
+

@@ -69,7 +69,7 @@ export const SayaView: React.FC<SayaViewProps> = ({
   onOpenAdminAnalytics,
   currentSubscription,
 }) => {
-  const { profile, user, logout, switchDemoUser, isDemoMode } = useAuth();
+  const { profile, user, logout } = useAuth();
   const { family, members } = useFamily();
   const { notifications, recurringTransactions, templates } = useFinance();
 
