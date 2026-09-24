@@ -325,30 +325,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* 6. Single Primary AI Insight ("Insight untukmu") */}
-      <div className="bg-[#E8F2EC]/70 border border-[#E5E7EB] rounded-3xl p-4.5 shadow-subtle space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-xl bg-[#144D3A] text-white flex items-center justify-center text-xs shrink-0 shadow-subtle">
-              <Bot className="w-4 h-4" />
+      <div className="bg-[#E8F2EC]/70 border border-[#E5E7EB] rounded-3xl p-5 shadow-subtle space-y-3">
+        <div className="flex items-center justify-between pb-2.5 border-b border-[#144D3A]/10">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-2xl bg-[#144D3A] text-white flex items-center justify-center shrink-0 shadow-subtle">
+              <Bot className="w-4.5 h-4.5" />
             </div>
-            <h3 className="text-xs sm:text-sm font-bold text-[#144D3A]">Insight untukmu</h3>
+            <h3 className="text-sm font-bold text-[#144D3A]">Insight untukmu</h3>
           </div>
           <button
             onClick={() => onNavigateTab('ai')}
-            className="text-[11px] font-bold text-[#144D3A] hover:text-[#2E7D61] inline-flex items-center gap-0.5 cursor-pointer"
+            className="text-xs font-semibold text-[#144D3A] hover:text-[#2E7D61] inline-flex items-center gap-0.5 cursor-pointer"
           >
-            Tanya AI <ChevronRight className="w-3 h-3" />
+            Tanya AI <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        <div className="pt-1">
-          <p className="text-xs font-bold text-[#1F2937] leading-snug">
-            {primaryInsight.title}: <span className="font-normal text-[#4B5563]">{primaryInsight.description}</span>
+        <div className="space-y-1.5 pt-0.5">
+          <h4 className="text-xs sm:text-sm font-bold text-[#1F2937]">
+            {primaryInsight.title}
+          </h4>
+          <p className="text-xs text-[#4B5563] leading-relaxed font-normal">
+            {primaryInsight.description}
           </p>
           {primaryInsight.recommendation && (
-            <p className="text-[11px] text-[#2E7D61] font-semibold mt-1 flex items-center gap-1">
-              <span>💡 {primaryInsight.recommendation}</span>
-            </p>
+            <div className="mt-3 p-3 rounded-2xl bg-[#144D3A]/5 border border-[#144D3A]/10 flex items-start gap-2 text-xs">
+              <span className="shrink-0 text-sm mt-0.5">💡</span>
+              <p className="font-semibold text-[#144D3A] leading-relaxed flex-1">
+                {primaryInsight.recommendation}
+              </p>
+            </div>
           )}
         </div>
       </div>
