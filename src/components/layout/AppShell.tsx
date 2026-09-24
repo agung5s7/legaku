@@ -168,8 +168,8 @@ export const AppShell: React.FC = () => {
 
       {/* Main Content Layout */}
       <div className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 flex gap-8">
-        {/* Desktop Left Sidebar (hidden on mobile) */}
-        <aside className="hidden sm:flex flex-col w-64 shrink-0 space-y-4">
+        {/* Desktop Left Sidebar (sticky on scroll) */}
+        <aside className="hidden sm:flex flex-col w-64 shrink-0 space-y-4 sticky top-20 h-[calc(100vh-5rem)] overflow-y-auto self-start no-scrollbar">
           {/* Primary Quick Catat Buttons */}
           <div className="space-y-2">
             <button
