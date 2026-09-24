@@ -122,28 +122,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-5 pb-6 font-sans">
-      {/* 1. Header: Greeting & Family Badge */}
+      {/* 1. Header: Greeting & Member Count Badge */}
       <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="text-xl sm:text-2xl font-bold text-[#1F2937] tracking-tight truncate">
             Halo, {profile?.full_name?.split(' ')[0] || 'Agung'} 👋
           </h2>
-          <p className="text-xs text-[#6B7280] mt-0.5 font-medium truncate">
+          <p className="text-xs text-[#6B7280] mt-0.5 font-medium leading-normal">
             Keluarga yang tenang dimulai dari uang yang lebih dipahami.
           </p>
         </div>
 
-        {/* Family Pill Badge */}
-        <div className="flex items-center gap-2 bg-white border border-[#E5E7EB] px-3 py-1.5 rounded-2xl shadow-subtle shrink-0">
+        {/* Member Count Pill Badge */}
+        <div className="flex items-center gap-1.5 bg-white border border-[#E5E7EB] px-3 py-1.5 rounded-2xl shadow-subtle shrink-0">
           <Users className="w-3.5 h-3.5 text-[#144D3A]" />
-          <div className="text-left">
-            <span className="text-xs font-bold text-[#1F2937] block leading-tight truncate max-w-[100px]">
-              {family?.name || 'Keluarga'}
-            </span>
-            <span className="text-[10px] text-[#6B7280] block leading-none font-medium">
-              {members.length} anggota
-            </span>
-          </div>
+          <span className="text-xs font-bold text-[#1F2937]">
+            {members.length} Anggota
+          </span>
         </div>
       </div>
 
