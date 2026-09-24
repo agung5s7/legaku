@@ -90,7 +90,7 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
-    const geminiModel = Deno.env.get("GEMINI_RECEIPT_MODEL") || "gemini-3.8-flash";
+    const geminiModel = Deno.env.get("GEMINI_RECEIPT_MODEL") || "gemini-3.6-flash";
 
     if (!geminiApiKey) {
       throw new Error("GEMINI_API_KEY is not configured");
@@ -247,7 +247,7 @@ serve(async (req) => {
     });
   } catch (error: any) {
     console.error("[process-receipt] Internal error:", error.message);
-    return new Response(JSON.stringify({ error: "Gagal memproses struk." }), {
+    return new Response(JSON.stringify({ error: error.message || "Gagal memproses struk." }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

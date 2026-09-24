@@ -104,12 +104,12 @@ export async function extractReceiptInformation(
 
   if (fnErr) {
     console.error('Edge function error:', fnErr);
-    throw new Error('Struk belum berhasil dibaca. Pastikan foto cukup terang, tidak blur, dan seluruh struk terlihat.');
+    throw new Error(fnErr.message || 'Struk belum berhasil dibaca. Pastikan foto cukup terang, tidak blur, dan seluruh struk terlihat.');
   }
 
   if (edgeData?.error) {
     console.error('Edge function returned error:', edgeData.error);
-    throw new Error(edgeData.error || 'Struk belum berhasil dibaca. Pastikan foto cukup terang, tidak blur, dan seluruh struk terlihat.');
+    throw new Error(edgeData.error);
   }
 
   // 4. Map Result

@@ -14,7 +14,7 @@ CREATE POLICY "Family members can upload receipts"
         AND auth.role() = 'authenticated'
         AND EXISTS (
             SELECT 1 FROM public.family_members
-            WHERE family_id = (storage.foldername(name))[1]::uuid
+            WHERE family_id::text = (storage.foldername(name))[1]
             AND user_id = auth.uid()
         )
     );
@@ -26,7 +26,7 @@ CREATE POLICY "Family members can view own family receipts"
         AND auth.role() = 'authenticated'
         AND EXISTS (
             SELECT 1 FROM public.family_members
-            WHERE family_id = (storage.foldername(name))[1]::uuid
+            WHERE family_id::text = (storage.foldername(name))[1]
             AND user_id = auth.uid()
         )
     );
@@ -38,7 +38,7 @@ CREATE POLICY "Family members can delete own family receipts"
         AND auth.role() = 'authenticated'
         AND EXISTS (
             SELECT 1 FROM public.family_members
-            WHERE family_id = (storage.foldername(name))[1]::uuid
+            WHERE family_id::text = (storage.foldername(name))[1]
             AND user_id = auth.uid()
         )
     );
