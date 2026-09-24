@@ -42,8 +42,10 @@ export const ReceiptConfirmationModal: React.FC<ReceiptConfirmationModalProps> =
       setSelectedCategory(extraction.suggested_category_id || categories[0]?.id || '');
       setSelectedAccount(accounts[0]?.id || '');
       setTxDate(extraction.transaction_date || new Date().toISOString().split('T')[0]);
-      setDescription(`Belanja di ${extraction.merchant_name}`);
-      setNotes(extraction.items?.length ? `${extraction.items.length} barang terdeteksi` : '');
+      const itemsDetail = extraction.items?.length
+        ? `${extraction.items.length} barang terdeteksi\n` + extraction.items.map(i => `• ${i.name}${i.amount ? ` - ${formatRupiah(i.amount)}` : ''}`).join('\n')
+        : '';
+      setNotes(itemsDetail);
     }
   }, [extraction, categories, accounts]);
 

@@ -6,7 +6,7 @@ import { CategoryIcon } from '../../components/ui/CategoryIcon';
 import { useFinance } from '../../context/FinanceContext';
 import { Transaction } from '../../types';
 import { formatRupiah, parseRupiahInput, formatIndoDate } from '../../utils/formatters';
-import { Trash2, Edit2, Calendar, Wallet, User, Tag, Sparkles, AlertCircle } from 'lucide-react';
+import { Trash2, Edit2, Calendar, Wallet, User, Tag, Sparkles, AlertCircle, ChevronDown, Receipt } from 'lucide-react';
 
 interface TransactionDetailModalProps {
   transaction: Transaction | null;
@@ -24,6 +24,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [showItemsList, setShowItemsList] = useState(false);
 
   // Edit fields
   const [editAmount, setEditAmount] = useState('');
@@ -42,6 +43,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
       setEditDate(transaction.transaction_date);
       setIsEditing(false);
       setIsConfirmingDelete(false);
+      setShowItemsList(false);
       setErrorMsg('');
     }
   }, [transaction]);
@@ -222,9 +224,59 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
               {formatRupiah(transaction.amount)}
             </div>
             <p className="text-sm font-semibold text-warm-dark mt-1">{transaction.description}</p>
-            {transaction.notes && (
-              <p className="text-xs text-warm-muted italic mt-1">"{transaction.notes}"</p>
-            )}
+            {transaction.notes && (() => {
+              const lines = transaction.notes.split('\n').map((l) => l.trim()).filter(Boolean);
+              const mainTitle = lines[0] || '';
+              const subItems = lines.slice(1);
+              const isDetectedBadge = mainTitle.toLowerCase().includes('barang terdeteksi') || subItems.length > 0;
+
+              if (isDetectedBadge) {
+                return (
+                  <div className="mt-2.5 flex flex-col items-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowItemsList(!showItemsList)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-sage-100/70 hover:bg-sage-100 text-forest-900 border border-sage-200/80 transition-all shadow-soft cursor-pointer"
+                    >
+                      <Receipt className="w-3.5 h-3.5 text-forest-700" />
+                      <span>{mainTitle}</span>
+                      <ChevronDown
+                        className={`w-3.5 h-3.5 text-forest-700 transition-transform duration-200 ${
+                          showItemsList ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </button>
+
+                    {showItemsList && (
+                      <div className="w-full mt-2.5 bg-white border border-warm-border/80 rounded-2xl p-3.5 text-left space-y-1.5 shadow-soft max-h-52 overflow-y-auto">
+                        <div className="text-[10px] font-bold text-warm-muted uppercase tracking-wider border-b border-warm-border/40 pb-1 flex items-center justify-between">
+                          <span>Rincian Barang Belanjaan</span>
+                          {subItems.length > 0 && <span className="font-semibold text-forest-800">{subItems.length} item</span>}
+                        </div>
+                        {subItems.length > 0 ? (
+                          subItems.map((item, idx) => {
+                            const cleanItem = item.replace(/^[•\-\*]\s*/, '');
+                            const parts = cleanItem.split(' - ');
+                            const itemName = parts[0];
+                            const itemPrice = parts.slice(1).join(' - ');
+                            return (
+                              <div key={idx} className="flex items-center justify-between text-xs text-warm-dark py-0.5 border-b border-warm-border/20 last:border-none">
+                                <span className="truncate pr-2 font-medium">{itemName}</span>
+                                {itemPrice && <span className="font-semibold text-forest-900 shrink-0">{itemPrice}</span>}
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <p className="text-xs text-warm-muted py-1 text-center">Rincian nama item tersimpan pada struk.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              return <p className="text-xs text-warm-muted italic mt-1">"{transaction.notes}"</p>;
+            })()}
           </div>
 
           {/* Details Table */}
