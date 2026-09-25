@@ -243,18 +243,18 @@ export const GoalsView: React.FC = () => {
       )}
 
       {/* Header Matching Reference Design */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-[#1F2937]">Tujuan Keuangan</h2>
-          <p className="text-xs text-[#6B7280] mt-0.5">
+      <div className="flex items-center justify-between gap-3 sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-xl font-bold text-[#1F2937] tracking-tight">Tujuan Keuangan</h2>
+          <p className="text-xs text-[#6B7280] mt-0.5 leading-relaxed">
             Mewujudkan masa depan yang tenang bersama pasangan.
           </p>
         </div>
         <button
           type="button"
           onClick={() => setIsAddOpen(true)}
-          className="w-10 h-10 rounded-2xl bg-[#144D3A] hover:bg-[#2E7D61] text-white flex items-center justify-center shadow-sm active:scale-95 transition-all"
-          aria-label="Tambah Target"
+          className="w-10 h-10 rounded-2xl bg-[#144D3A] hover:bg-[#2E7D61] text-white flex items-center justify-center shadow-sm active:scale-95 transition-all shrink-0 cursor-pointer"
+          aria-label="Tambah Target Impian"
         >
           <Plus className="w-5 h-5 stroke-[2.5]" />
         </button>
