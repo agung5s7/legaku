@@ -58,7 +58,9 @@ interface FinanceContextType {
   deleteAccount: (id: string) => Promise<{ error?: string }>;
   // Goals
   addGoal: (data: Omit<Goal, 'id' | 'family_id' | 'created_at' | 'updated_at'> & { family_id?: string }) => Promise<{ error?: string; goal?: Goal }>;
+  updateGoal: (id: string, updates: Partial<Omit<Goal, 'id' | 'family_id' | 'created_at' | 'updated_at'>>) => Promise<{ error?: string }>;
   updateGoalAmount: (id: string, additionalAmount: number) => Promise<{ error?: string }>;
+  deleteGoal: (id: string) => Promise<{ error?: string }>;
   // Budgets
   setCategoryBudget: (categoryId: string, amount: number) => Promise<{ error?: string }>;
   // Transfers (Phase 3)
@@ -896,6 +898,36 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return { error: 'Koneksi database belum tersedia' };
   };
 
+  const updateGoal = async (
+    id: string,
+    updates: Partial<Omit<Goal, 'id' | 'family_id' | 'created_at' | 'updated_at'>>
+  ): Promise<{ error?: string }> => {
+    const target = goals.find((g) => g.id === id);
+    if (!target) return { error: 'Target impian tidak ditemukan' };
+
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('goals')
+          .update({ ...updates, updated_at: new Date().toISOString() })
+          .eq('id', id);
+        if (error) return { error: error.message };
+        await recordActivity(
+          'goal_updated',
+          'goal',
+          `${profile?.full_name || 'Keluarga'} memperbarui target impian`,
+          updates.name || target.name,
+          id
+        );
+        await loadFinanceData();
+        return {};
+      } catch (e: any) {
+        return { error: e?.message || 'Gagal memperbarui target impian' };
+      }
+    }
+    return { error: 'Koneksi database belum tersedia' };
+  };
+
   const updateGoalAmount = async (id: string, additionalAmount: number): Promise<{ error?: string }> => {
     const target = goals.find((g) => g.id === id);
     if (!target) return { error: 'Target impian tidak ditemukan' };
@@ -910,6 +942,30 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return {};
       } catch (e: any) {
         return { error: e?.message || 'Gagal mengupdate target' };
+      }
+    }
+    return { error: 'Koneksi database belum tersedia' };
+  };
+
+  const deleteGoal = async (id: string): Promise<{ error?: string }> => {
+    const target = goals.find((g) => g.id === id);
+    if (!target) return { error: 'Target impian tidak ditemukan' };
+
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase.from('goals').delete().eq('id', id);
+        if (error) return { error: error.message };
+        await recordActivity(
+          'goal_deleted',
+          'goal',
+          `${profile?.full_name || 'Keluarga'} menghapus target impian`,
+          target.name,
+          id
+        );
+        await loadFinanceData();
+        return {};
+      } catch (e: any) {
+        return { error: e?.message || 'Gagal menghapus target' };
       }
     }
     return { error: 'Koneksi database belum tersedia' };
@@ -972,7 +1028,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateAccount,
         deleteAccount,
         addGoal,
+        updateGoal,
         updateGoalAmount,
+        deleteGoal,
         setCategoryBudget,
         addTransfer,
         deleteTransfer,

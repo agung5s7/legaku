@@ -8,17 +8,21 @@ import { Input } from '../../components/ui/Input';
 import {
   Target,
   Plus,
-  Calendar,
   ShieldCheck,
   Plane,
   GraduationCap,
   Home,
   CheckCircle2,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  AlertTriangle,
+  Sparkles,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export const GoalsView: React.FC = () => {
-  const { goals, addGoal, updateGoalAmount } = useFinance();
+  const { goals, addGoal, updateGoal, updateGoalAmount, deleteGoal } = useFinance();
 
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'completed'>('active');
 
@@ -35,6 +39,23 @@ export const GoalsView: React.FC = () => {
   // Top Up Modal State
   const [topUpGoal, setTopUpGoal] = useState<Goal | null>(null);
   const [topUpAmountInput, setTopUpAmountInput] = useState('');
+
+  // Edit Goal Modal State
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editTargetAmount, setEditTargetAmount] = useState('');
+  const [editCurrentAmount, setEditCurrentAmount] = useState('');
+  const [editTargetDate, setEditTargetDate] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editErrorMsg, setEditErrorMsg] = useState('');
+
+  // Delete Confirm Modal State
+  const [deletingGoal, setDeletingGoal] = useState<Goal | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Dropdown Menu Active State
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
   // Icon selector based on name
   const getGoalIcon = (name: string) => {
@@ -55,6 +76,34 @@ export const GoalsView: React.FC = () => {
         <IconComponent className="w-5 h-5 text-[#144D3A]" />
       </div>
     );
+  };
+
+  // Smart Projection Calculator
+  const getGoalProjections = (goal: Goal) => {
+    const remaining = Math.max(0, goal.target_amount - goal.current_amount);
+    const isCompleted = goal.target_amount > 0 && goal.current_amount >= goal.target_amount;
+
+    if (isCompleted || remaining <= 0) {
+      return { isCompleted: true, remaining: 0, monthlySaving: null, monthsLeft: 0 };
+    }
+
+    if (!goal.target_date) {
+      return { isCompleted: false, remaining, monthlySaving: null, monthsLeft: null };
+    }
+
+    const today = new Date();
+    const target = new Date(goal.target_date);
+    const diffTime = target.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays <= 0) {
+      return { isCompleted: false, remaining, monthlySaving: remaining, monthsLeft: 0, isPastDue: true };
+    }
+
+    const monthsLeft = Math.max(1, Math.ceil(diffDays / 30.4));
+    const monthlySaving = Math.ceil(remaining / monthsLeft);
+
+    return { isCompleted: false, remaining, monthlySaving, monthsLeft, isPastDue: false };
   };
 
   const filteredGoals = goals.filter((g) => {
@@ -108,6 +157,59 @@ export const GoalsView: React.FC = () => {
     }
   };
 
+  const openEditModal = (goal: Goal) => {
+    setActiveMenuId(null);
+    setEditingGoal(goal);
+    setEditName(goal.name);
+    setEditTargetAmount(formatRupiah(goal.target_amount));
+    setEditCurrentAmount(formatRupiah(goal.current_amount));
+    setEditTargetDate(goal.target_date || '');
+    setEditDescription(goal.description || '');
+    setEditErrorMsg('');
+  };
+
+  const handleUpdateGoal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingGoal) return;
+    setEditErrorMsg('');
+
+    const targetNum = parseRupiahInput(editTargetAmount);
+    const currentNum = parseRupiahInput(editCurrentAmount);
+
+    if (!editName.trim()) {
+      setEditErrorMsg('Nama target impian tidak boleh kosong.');
+      return;
+    }
+    if (targetNum <= 0) {
+      setEditErrorMsg('Target nominal harus lebih dari 0.');
+      return;
+    }
+
+    setIsEditing(true);
+    const res = await updateGoal(editingGoal.id, {
+      name: editName.trim(),
+      target_amount: targetNum,
+      current_amount: currentNum,
+      target_date: editTargetDate || null,
+      description: editDescription.trim() || null,
+    });
+    setIsEditing(false);
+
+    if (res.error) {
+      setEditErrorMsg(res.error);
+    } else {
+      setEditingGoal(null);
+    }
+  };
+
+  const handleDeleteGoal = async () => {
+    if (!deletingGoal) return;
+    setIsDeleting(true);
+    await deleteGoal(deletingGoal.id);
+    setIsDeleting(false);
+    setDeletingGoal(null);
+  };
+
   const handleTopUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!topUpGoal) return;
@@ -132,6 +234,14 @@ export const GoalsView: React.FC = () => {
 
   return (
     <div className="space-y-5 pb-6">
+      {/* Click outside backdrop for dropdown menu */}
+      {activeMenuId && (
+        <div
+          className="fixed inset-0 z-10"
+          onClick={() => setActiveMenuId(null)}
+        />
+      )}
+
       {/* Header Matching Reference Design */}
       <div className="flex items-center justify-between">
         <div>
@@ -195,7 +305,7 @@ export const GoalsView: React.FC = () => {
           </div>
           <h3 className="text-sm font-bold text-[#1F2937]">Belum Ada Target di Kategori Ini</h3>
           <p className="text-xs text-[#6B7280] max-w-xs mx-auto mt-1 mb-4">
-            Mulai dari hal mendasar seperti Dana Darurat atau rencana liburan bersama keluarga.
+            Mulai dari hal mendasar seperti Dana Darurat, Bebas Hutang, atau rencana liburan keluarga.
           </p>
           <Button variant="primary" size="sm" onClick={() => setIsAddOpen(true)}>
             Buat Target Pertama
@@ -206,11 +316,14 @@ export const GoalsView: React.FC = () => {
           {filteredGoals.map((goal) => {
             const progress = Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100));
             const isCompleted = progress >= 100;
+            const projection = getGoalProjections(goal);
 
             return (
               <div
                 key={goal.id}
-                className="bg-white border border-[#E5E7EB] rounded-3xl p-5 shadow-sm hover:shadow-md transition-all"
+                className={`bg-white border rounded-3xl p-5 shadow-sm hover:shadow-md transition-all relative ${
+                  isCompleted ? 'border-[#22C55E]/40 ring-1 ring-[#22C55E]/20' : 'border-[#E5E7EB]'
+                }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3.5 min-w-0">
@@ -219,31 +332,97 @@ export const GoalsView: React.FC = () => {
                       <h3 className="text-sm sm:text-base font-bold text-[#1F2937] truncate">
                         {goal.name}
                       </h3>
-                      <p className="text-sm font-extrabold text-[#144D3A] mt-0.5">
+                      <p className="text-base font-extrabold text-[#144D3A] mt-0.5">
                         {formatRupiah(goal.target_amount)}
                       </p>
-                      <p className="text-xs text-[#6B7280] mt-0.5">
-                        {formatRupiah(goal.current_amount)} terkumpul
+                      <p className="text-xs text-[#6B7280] mt-0.5 flex items-center flex-wrap gap-1">
+                        <span><strong className="text-[#1F2937] font-semibold">{formatRupiah(goal.current_amount)}</strong> terkumpul</span>
+                        {!isCompleted && (
+                          <>
+                            <span className="text-[#D1D5DB]">•</span>
+                            <span className="text-[#B25E46] font-medium">Sisa {formatRupiah(projection.remaining)}</span>
+                          </>
+                        )}
                       </p>
                     </div>
                   </div>
 
-                  <span
-                    className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${
-                      isCompleted ? 'bg-[#22C55E]/15 text-[#22C55E]' : 'bg-[#E8F2EC] text-[#144D3A]'
-                    }`}
-                  >
-                    {progress}%
-                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span
+                      className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                        isCompleted
+                          ? 'bg-[#22C55E]/15 text-[#16A34A] flex items-center gap-1'
+                          : 'bg-[#E8F2EC] text-[#144D3A]'
+                      }`}
+                    >
+                      {isCompleted ? (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Tercapai 🎉
+                        </>
+                      ) : (
+                        `${progress}%`
+                      )}
+                    </span>
+
+                    {/* Action 3-dots Menu Button */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setActiveMenuId(activeMenuId === goal.id ? null : goal.id)}
+                        className="w-8 h-8 rounded-full hover:bg-black/5 flex items-center justify-center text-[#6B7280] transition-colors"
+                        aria-label="Menu Opsi Target"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+
+                      {/* Dropdown Menu */}
+                      {activeMenuId === goal.id && (
+                        <div className="absolute right-0 top-9 w-36 bg-white border border-[#E5E7EB] rounded-2xl shadow-lg z-20 py-1 text-xs animate-in fade-in zoom-in-95">
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(goal)}
+                            className="w-full text-left px-3 py-2 hover:bg-[#F3F4F6] text-[#374151] flex items-center gap-2 font-medium"
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-[#6B7280]" />
+                            Edit Target
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveMenuId(null);
+                              setDeletingGoal(goal);
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-red-50 text-[#DC2626] flex items-center gap-2 font-medium"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-[#DC2626]" />
+                            Hapus Target
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Progress Bar */}
-                <div className="w-full bg-[#E8F2EC] h-2.5 rounded-full overflow-hidden mt-4">
+                <div className="w-full bg-[#E8F2EC] h-2.5 rounded-full overflow-hidden mt-3.5">
                   <div
-                    className="bg-[#144D3A] h-full rounded-full transition-all duration-500"
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      isCompleted ? 'bg-[#22C55E]' : 'bg-[#144D3A]'
+                    }`}
                     style={{ width: `${progress}%` }}
                   />
                 </div>
+
+                {/* Smart Saving Guidance (If monthly projection available) */}
+                {projection.monthlySaving && !isCompleted && (
+                  <div className="mt-3 flex items-center gap-1.5 text-[11px] text-[#144D3A] bg-[#E8F2EC]/70 rounded-xl px-2.5 py-1.5 font-medium border border-[#E8F2EC]">
+                    <Sparkles className="w-3.5 h-3.5 text-[#C49744] shrink-0" />
+                    <span>
+                      Perlu nabung ~<strong>{formatShortRupiah(projection.monthlySaving)}</strong>/bln ({projection.monthsLeft} bln lagi)
+                    </span>
+                  </div>
+                )}
 
                 {/* Action & Date */}
                 <div className="flex items-center justify-between pt-3 mt-3 border-t border-[#E5E7EB] text-xs">
@@ -253,7 +432,7 @@ export const GoalsView: React.FC = () => {
                   <Button
                     type="button"
                     size="sm"
-                    variant="outline"
+                    variant={isCompleted ? 'outline' : 'outline'}
                     onClick={() => {
                       setTopUpGoal(goal);
                       setTopUpAmountInput('');
@@ -279,7 +458,7 @@ export const GoalsView: React.FC = () => {
         <form onSubmit={handleCreateGoal} className="space-y-4">
           <Input
             label="Nama Target Impian"
-            placeholder="Contoh: Dana Darurat, Liburan ke Jepang, DP Rumah"
+            placeholder="Contoh: Dana Darurat, Bebas Pinjol, DP Rumah"
             value={goalName}
             onChange={(e) => setGoalName(e.target.value)}
             autoFocus
@@ -326,6 +505,112 @@ export const GoalsView: React.FC = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* EDIT GOAL MODAL */}
+      <Modal
+        isOpen={Boolean(editingGoal)}
+        onClose={() => setEditingGoal(null)}
+        title="Edit Target Keuangan"
+        subtitle="Perbarui target, nominal tabungan, atau batas waktu."
+      >
+        <form onSubmit={handleUpdateGoal} className="space-y-4">
+          <Input
+            label="Nama Target Impian"
+            placeholder="Contoh: Dana Darurat, Bebas Pinjol, DP Rumah"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            autoFocus
+          />
+
+          <Input
+            label="Target Nominal (Rp)"
+            placeholder="Rp 0"
+            value={editTargetAmount}
+            onChange={(e) => setEditTargetAmount(formatRupiah(parseRupiahInput(e.target.value)))}
+          />
+
+          <Input
+            label="Nominal Terkumpul Saat Ini (Rp)"
+            placeholder="Rp 0"
+            value={editCurrentAmount}
+            onChange={(e) => setEditCurrentAmount(formatRupiah(parseRupiahInput(e.target.value)))}
+          />
+
+          <Input
+            type="date"
+            label="Target Waktu Tercapai (Opsional)"
+            value={editTargetDate}
+            onChange={(e) => setEditTargetDate(e.target.value)}
+          />
+
+          <Input
+            label="Catatan / Rencana Pendukung"
+            placeholder="Misal: Nabung Rp 1 juta tiap tanggal gajian"
+            value={editDescription}
+            onChange={(e) => setEditDescription(e.target.value)}
+          />
+
+          {editErrorMsg && <p className="text-xs text-earth-rust">{editErrorMsg}</p>}
+
+          <div className="pt-2 flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEditingGoal(null)}
+              className="flex-1 h-12"
+            >
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              isLoading={isEditing}
+              className="flex-1 h-12"
+            >
+              Simpan Perubahan
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* DELETE CONFIRMATION MODAL */}
+      <Modal
+        isOpen={Boolean(deletingGoal)}
+        onClose={() => setDeletingGoal(null)}
+        title="Hapus Target Keuangan?"
+        subtitle="Tindakan ini tidak dapat dibatalkan."
+      >
+        <div className="space-y-4">
+          <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div className="text-xs text-red-800 leading-relaxed">
+              Target <strong>"{deletingGoal?.name}"</strong> dengan akumulasi dana{' '}
+              <strong>{formatRupiah(deletingGoal?.current_amount || 0)}</strong> akan dihapus dari daftar impian keluarga.
+            </div>
+          </div>
+
+          <div className="pt-2 flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isDeleting}
+              onClick={() => setDeletingGoal(null)}
+              className="flex-1 h-12"
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              disabled={isDeleting}
+              isLoading={isDeleting}
+              onClick={handleDeleteGoal}
+              className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-semibold"
+            >
+              Ya, Hapus
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* TOP UP GOAL MODAL */}
