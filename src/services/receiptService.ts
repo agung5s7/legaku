@@ -104,12 +104,30 @@ export async function extractReceiptInformation(
 
   if (fnErr) {
     console.error('Edge function error:', fnErr);
-    throw new Error(fnErr.message || 'Struk belum berhasil dibaca. Pastikan foto cukup terang, tidak blur, dan seluruh struk terlihat.');
+    let friendlyMessage = 'Foto struk belum berhasil terbaca dengan jelas. Pastikan foto tegak lurus, pencahayaan cukup terang, dan tidak buram.';
+
+    // Supabase FunctionsHttpError carries response in context
+    try {
+      if ((fnErr as any).context && typeof (fnErr as any).context.json === 'function') {
+        const errorJson = await (fnErr as any).context.json();
+        if (errorJson?.error && typeof errorJson.error === 'string') {
+          const isTech = /edge function|non-2xx|status code|functionshttperror/i.test(errorJson.error);
+          if (!isTech) {
+            friendlyMessage = errorJson.error;
+          }
+        }
+      }
+    } catch {
+      // Ignore JSON extraction errors and keep friendly message
+    }
+
+    throw new Error(friendlyMessage);
   }
 
   if (edgeData?.error) {
     console.error('Edge function returned error:', edgeData.error);
-    throw new Error(edgeData.error);
+    const isTech = /edge function|non-2xx|status code|functionshttperror/i.test(edgeData.error);
+    throw new Error(isTech ? 'Foto struk belum berhasil terbaca dengan jelas. Pastikan foto tegak lurus, pencahayaan cukup terang, dan tidak buram.' : edgeData.error);
   }
 
   // 4. Map Result

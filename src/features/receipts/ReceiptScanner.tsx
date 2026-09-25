@@ -56,7 +56,13 @@ export const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
       setIsProcessing(false);
       onExtractionComplete(result);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Terjadi kendala saat membaca struk. Silakan coba foto ulang.');
+      console.error('Error extracting receipt:', err);
+      const rawMsg = err?.message || '';
+      const isTechnical = /edge function|non-2xx|status code|functionshttperror|failed to fetch|unauthorized/i.test(rawMsg);
+      const displayMsg = !rawMsg || isTechnical
+        ? 'Struk belum berhasil terbaca dengan jelas. Pastikan foto tegak lurus, pencahayaan cukup terang, dan tidak buram.'
+        : rawMsg;
+      setErrorMessage(displayMsg);
       setIsProcessing(false);
     }
   };
@@ -80,25 +86,34 @@ export const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
       />
 
       {!imagePreview ? (
-        <div
-          onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-sage-300 hover:border-forest-600 bg-cream-50/70 hover:bg-sage-50/50 rounded-3xl p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center space-y-3 shadow-soft group"
-        >
-          <div className="w-16 h-16 rounded-3xl bg-forest-800 text-warm-white flex items-center justify-center shadow-soft group-hover:scale-105 transition-transform">
-            <Camera className="w-8 h-8" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-forest-950">Foto atau Unggah Struk</h3>
-            <p className="text-xs text-warm-muted max-w-xs mx-auto mt-1 leading-relaxed">
-              Ambil foto struk belanjaan supermarket, restoran, minimarket, atau SPBU. AI LEGAKU akan mengekstrak data belanja Anda.
-            </p>
+        <div className="space-y-3">
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="border-2 border-dashed border-sage-300 hover:border-forest-600 bg-cream-50/70 hover:bg-sage-50/50 rounded-3xl p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center space-y-3 shadow-soft group"
+          >
+            <div className="w-16 h-16 rounded-3xl bg-forest-800 text-warm-white flex items-center justify-center shadow-soft group-hover:scale-105 transition-transform">
+              <Camera className="w-8 h-8" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-forest-950">Foto atau Unggah Struk</h3>
+              <p className="text-xs text-warm-muted max-w-xs mx-auto mt-1 leading-relaxed">
+                Ambil foto struk belanjaan supermarket, restoran, minimarket, atau SPBU. AI LEGAKU akan mengekstrak data belanja Anda.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <span className="text-xs px-3 py-1.5 rounded-full bg-white border border-warm-border text-forest-800 font-medium flex items-center gap-1.5 shadow-soft">
+                <Upload className="w-3.5 h-3.5" />
+                Pilih dari Galeri / Kamera
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 pt-2">
-            <span className="text-xs px-3 py-1.5 rounded-full bg-white border border-warm-border text-forest-800 font-medium flex items-center gap-1.5 shadow-soft">
-              <Upload className="w-3.5 h-3.5" />
-              Pilih dari Galeri / Kamera
-            </span>
+          <div className="bg-sage-50/70 border border-sage-200/60 rounded-2xl p-3 flex items-start gap-2.5 text-left">
+            <Sparkles className="w-4 h-4 text-forest-700 shrink-0 mt-0.5" />
+            <div className="text-[11px] text-forest-900 leading-relaxed">
+              <span className="font-semibold text-forest-950">Tips scan optimal:</span> Posisikan kamera tegak lurus di atas struk, pastikan tulisan tajam/tidak blur, dan hindari pantulan cahaya pada kertas struk.
+            </div>
           </div>
         </div>
       ) : (
@@ -144,13 +159,16 @@ export const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
 
           {errorMessage && (
             <div className="bg-earth-terracotta/10 border border-earth-terracotta/20 text-earth-rust text-xs p-3.5 rounded-2xl flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="font-semibold">{errorMessage}</p>
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-earth-rust" />
+              <div className="flex-1 space-y-1">
+                <p className="font-semibold text-earth-rust">{errorMessage}</p>
+                <p className="text-[11px] text-warm-muted leading-relaxed">
+                  Tips: Posisikan kamera tegak lurus, pastikan teks struk fokus/tajam, dan hindari pantulan cahaya pada kertas kasir.
+                </p>
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="text-xs font-bold text-earth-rust underline mt-1.5 inline-block"
+                  className="text-xs font-bold text-earth-rust hover:text-earth-rust/80 underline pt-1 inline-block"
                 >
                   Coba Foto Lagi
                 </button>

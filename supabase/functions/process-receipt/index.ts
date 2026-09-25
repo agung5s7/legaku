@@ -214,7 +214,7 @@ serve(async (req) => {
     const extracted = JSON.parse(textResult);
 
     if (!extracted.is_receipt) {
-      return new Response(JSON.stringify({ error: "Gambar tidak dikenali sebagai struk belanja." }), {
+      return new Response(JSON.stringify({ error: "Gambar tidak dikenali sebagai struk belanja. Pastikan posisi struk tegak lurus dan seluruh bagian struk terlihat jelas." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -247,7 +247,7 @@ serve(async (req) => {
     });
   } catch (error: any) {
     console.error("[process-receipt] Internal error:", error.message);
-    return new Response(JSON.stringify({ error: error.message || "Gagal memproses struk." }), {
+    return new Response(JSON.stringify({ error: "Struk belum berhasil dibaca. Pastikan foto tegak lurus, pencahayaan cukup terang, dan tidak buram." }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
