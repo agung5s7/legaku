@@ -9,6 +9,7 @@ interface ModalProps {
   subtitle?: string;
   children: React.ReactNode;
   className?: string;
+  bodyClassName?: string;
   fullHeightOnMobile?: boolean;
   size?: 'sm' | 'md' | 'lg' | 'xl';
 }
@@ -20,6 +21,7 @@ export const Modal: React.FC<ModalProps> = ({
   subtitle,
   children,
   className,
+  bodyClassName,
   fullHeightOnMobile = false,
   size = 'md',
 }) => {
@@ -70,14 +72,14 @@ export const Modal: React.FC<ModalProps> = ({
 
         {/* Header */}
         {(title || subtitle) && (
-          <div className="flex items-start justify-between px-6 pt-4 sm:pt-6 pb-3 border-b border-[#E5E7EB]/70">
+          <div className="flex items-start justify-between px-4 sm:px-6 pt-3 sm:pt-5 pb-2.5 sm:pb-3 border-b border-[#E5E7EB]/70">
             <div>
-              {title && <h2 className="text-lg font-bold text-[#144D3A] tracking-tight">{title}</h2>}
-              {subtitle && <p className="text-xs text-[#6B7280] mt-0.5">{subtitle}</p>}
+              {title && <h2 className="text-base sm:text-lg font-bold text-[#144D3A] tracking-tight">{title}</h2>}
+              {subtitle && <p className="text-[11px] sm:text-xs text-[#6B7280] mt-0.5">{subtitle}</p>}
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-full text-[#6B7280] hover:text-[#144D3A] hover:bg-[#E8F2EC] transition-colors cursor-pointer"
+              className="p-1 rounded-full text-[#6B7280] hover:text-[#144D3A] hover:bg-[#E8F2EC] transition-colors cursor-pointer"
               aria-label="Tutup dialog"
             >
               <X className="w-5 h-5" />
@@ -86,7 +88,7 @@ export const Modal: React.FC<ModalProps> = ({
         )}
 
         {/* Body */}
-        <div className="p-6 overflow-y-auto no-scrollbar">{children}</div>
+        <div className={cn('p-4 sm:p-6 overflow-y-auto no-scrollbar', bodyClassName)}>{children}</div>
       </div>
     </div>
   );

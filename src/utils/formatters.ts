@@ -38,32 +38,40 @@ export function parseRupiahInput(value: string): number {
 }
 
 /**
- * Human-friendly Indonesian date format
- * Example: "2026-09-20" -> "20 September 2026"
+ * Standard Indonesian date format: DD/MM/YYYY
+ * Example: "2026-09-25" -> "25/09/2026"
  */
-export function formatIndoDate(dateStr: string): string {
+export function formatIndoDate(dateStr: string | Date): string {
   try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return new Intl.DateTimeFormat('id-ID', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    }).format(d);
+    if (!dateStr) return '';
+    // Handle YYYY-MM-DD string cleanly without timezone drift
+    if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+      const parts = dateStr.slice(0, 10).split('-');
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+    if (isNaN(d.getTime())) return typeof dateStr === 'string' ? dateStr : '';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
   } catch {
-    return dateStr;
+    return typeof dateStr === 'string' ? dateStr : '';
   }
 }
 
 export const formatDateIndonesian = formatIndoDate;
+export const formatDateDDMMYYYY = formatIndoDate;
 
 /**
- * Relative date group title for transaction history
- * Example: Today -> "Hari Ini, 20 September"
- * Yesterday -> "Kemarin, 19 September"
+ * Relative date group title for transaction history using DD/MM/YYYY
+ * Example: Today -> "Hari Ini (25/09/2026)"
+ * Yesterday -> "Kemarin (24/09/2026)"
+ * Other -> "23/09/2026"
  */
 export function getRelativeDateTitle(dateStr: string): string {
   try {
+    const formatted = formatIndoDate(dateStr);
     const target = new Date(dateStr);
     const today = new Date();
     const yesterday = new Date();
@@ -79,19 +87,10 @@ export function getRelativeDateTitle(dateStr: string): string {
       target.getMonth() === yesterday.getMonth() &&
       target.getDate() === yesterday.getDate();
 
-    const dayMonth = new Intl.DateTimeFormat('id-ID', {
-      day: 'numeric',
-      month: 'long',
-    }).format(target);
+    if (isToday) return `Hari Ini (${formatted})`;
+    if (isYesterday) return `Kemarin (${formatted})`;
 
-    if (isToday) return `Hari Ini, ${dayMonth}`;
-    if (isYesterday) return `Kemarin, ${dayMonth}`;
-
-    return new Intl.DateTimeFormat('id-ID', {
-      day: 'numeric',
-      month: 'long',
-      year: target.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
-    }).format(target);
+    return formatted;
   } catch {
     return dateStr;
   }
